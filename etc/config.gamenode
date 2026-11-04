@@ -1,0 +1,24 @@
+include "config.path"
+include "config.db"
+-- 线程个数
+thread = 8
+
+-- 启动配置
+bootstrap = "snlua bootstrap"   -- The service for bootstrap
+start = "gamenode"  -- main script
+nodename = "gamenode"
+
+harbor = 0
+
+max_online_limit = 2000
+agent_login_min = 1000
+
+--保存间隔
+user_save_interval = 60 * 5
+
+--gameworld端口
+login_port = 9999
+gate_port = 8888
+debug_console_port = 7777
+
+luaservice = luaservice..root.."service/game/?.lua;"

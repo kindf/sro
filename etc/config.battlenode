@@ -1,0 +1,11 @@
+include "config.path"
+-- 线程个数
+thread = 8
+-- 启动配置
+bootstrap = "snlua bootstrap"   -- The service for bootstrap
+start = "battlenode"  -- main script
+nodename = "battlenode"
+
+harbor = 0
+
+luaservice = luaservice..root.."service/battle/?.lua;"

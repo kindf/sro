@@ -1,0 +1,2 @@
+return 
+{maxDefSubDmg=201,lvSubDmgConst=2,normalSubDmgConst=300,attackAddAngerMin=50,beAttackedAddAngerMax=200,pveAttackerBornPosList={{x=-144,y=-16,},{x=-144,y=-246,},{x=-266,y=84,},{x=-266,y=-110,},{x=-266,y=-306,},},pveDefenderBornPosList={{x=140,y=-13,},{x=140,y=-243,},{x=263,y=87,},{x=263,y=-106,},{x=263,y=-303,},},timeout=120,skipTimeLimit=5,maxCirtRate=30000,}

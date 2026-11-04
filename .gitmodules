@@ -1,0 +1,12 @@
+[submodule "skynet"]
+	path = skynet
+	url = git@github.com:cloudwu/skynet.git
+[submodule "lualib/lua-protobuf"]
+	path = lualib/lua-protobuf
+	url = git@github.com:starwing/lua-protobuf.git
+[submodule "lualib/luafilesystem"]
+	path = lualib/luafilesystem
+	url = git@github.com:lunarmodules/luafilesystem.git
+[submodule "module/battle"]
+	path = module/battle
+	url = git@github.com:kindf/lua-game-battle.git

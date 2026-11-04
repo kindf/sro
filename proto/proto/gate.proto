@@ -1,0 +1,14 @@
+// TARGET_NODE gatenode
+syntax  = "proto3";
+package gate;
+
+// Gate连接认证
+message c2s_gate_auth {
+  string account = 1;
+  string loginToken = 2;
+}
+
+message s2c_gate_auth {
+  uint32 retCode = 1;
+  string sessionId = 2;
+}

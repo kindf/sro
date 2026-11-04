@@ -1,0 +1,10 @@
+local ConfigHelper = require "config.config_helper"
+local BattleBuffEffectEndByManual = require "buff.buff_end_cond.battle_buff_effect_end_by_transient"
+local BattleBuffEffectEndByTime = require "buff.buff_end_cond.battle_buff_effect_end_by_time"
+local BattleBuffEffectEndByAttack = require "buff.buff_end_cond.battle_buff_effect_end_by_attack"
+local BattleBuffEffectEndByTransient = require "buff.buff_end_cond.battle_buff_effect_end_by_transient"
+
+ConfigHelper.RegisterConfigClass("BattleBuffEffectEndByManual", BattleBuffEffectEndByManual)
+ConfigHelper.RegisterConfigClass("BattleBuffEffectEndByTime", BattleBuffEffectEndByTime)
+ConfigHelper.RegisterConfigClass("BattleBuffEffectEndByAttack", BattleBuffEffectEndByAttack)
+ConfigHelper.RegisterConfigClass("BattleBuffEffectEndByTransient", BattleBuffEffectEndByTransient)

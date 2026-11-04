@@ -1,0 +1,7 @@
+require "config.init"
+require "util.class"
+require "buff.buff_effect.init"
+require "buff.buff_end_cond.init"
+require "hit_action.init"
+require "hitzone.init"
+require "buff.trigger_cond.init"
