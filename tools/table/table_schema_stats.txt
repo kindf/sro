@@ -1,0 +1,58 @@
+﻿== 表 schema ==
+解析表数        : 392
+字段总数        : 3222
+有 CSV 的表     : 390
+CSV 缺列的表    : 0
+无 Proxy 的文件 : 13
+
+== 字段类型分布 ==
+int            1489
+string         397
+uint           277
+sv<int>        237
+v<int>         194
+s<int>         177
+float          128
+bool           120
+v<string>      38
+s<float>       29
+v<uint>        25
+v<float>       20
+vv<int>        12
+double         11
+sv<double>     11
+sv<float>      11
+s<string>      7
+vv<string>     7
+s<uint>        7
+long           5
+s<double>      5
+sv<uint>       4
+sv<string>     4
+v<double>      3
+vv<double>     2
+vv<uint>       1
+s<bool>        1
+
+== CSV 缺列 ==
+(none)
+
+== 异常 ==
+AuctionTable: index 不连续 [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12]
+BarrowTable: index 不连续 [0, 2, 3, 4]
+DailyActivitiesPushTable: index 不连续 [0, 1, 4]
+ElfTable: index 不连续 [0, 1, 4]
+EntityHandBookTable: index 不连续 [0, 5, 6, 7, 8, 9]
+EquipResolveTable: index 不连续 [0, 3, 4]
+EquipTable: index 不连续 [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+FishTable: index 不连续 [0, 2, 3, 4]
+LeaderBoardColumnInfoTable: index 不连续 [1]
+MainUiTable: index 不连续 [0, 1, 3, 4]
+PresentTable: index 不连续 [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+RechargeTable: index 不连续 [0, 2, 3, 4]
+ShareTable: index 不连续 [0, 1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 13]
+SpectatorTypeTable: index 不连续 [0, 2, 3]
+StallDetailTable: index 不连续 [0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12]
+StateExclusionTable: index 不连续 [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+TaskActivityTable: index 不连续 [0, 2]
+TutorialConfigTable: index 不连续 [0, 1, 2, 3, 6, 7, 8, 9, 13, 16, 19]

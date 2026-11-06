@@ -1,5 +1,0 @@
-return
-{
-[1] = {id=1,actionList={{ _type_='AttackHitAction',prevBuff=0,succBuff=0,hitzoneIdx=1,damage={9000,9500,10000,10500,11000,11500,12000,12500,13000,13500,14000,},beAttackedAddAnger={100,},},{ _type_='AttackHitAction',prevBuff=0,succBuff=0,hitzoneIdx=1,damage={9000,9500,10000,10500,11000,11500,12000,12500,13000,13500,14000,},beAttackedAddAnger={100,},},{ _type_='AttackHitAction',prevBuff=0,succBuff=0,hitzoneIdx=1,damage={9000,9500,10000,10500,11000,11500,12000,12500,13000,13500,14000,},beAttackedAddAnger={100,},},},hitzoneList={{ _type_='CircleHitZone',target=2,hitCnt=1,xoffset=0,yoffset=0,radius=100,},},},
-[2] = {id=2,actionList={{ _type_='AttackHitAction',prevBuff=0,succBuff=0,hitzoneIdx=1,damage={32000,34000,36000,38000,40000,42000,44000,46000,48000,50000,52000,},beAttackedAddAnger={100,},},},hitzoneList={{ _type_='CircleHitZone',target=2,hitCnt=1,xoffset=0,yoffset=0,radius=100,},},},
-}

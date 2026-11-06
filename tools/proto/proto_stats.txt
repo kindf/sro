@@ -1,0 +1,354 @@
+﻿== 协议清单统计 ==
+总数          : 1649
+PTC           : 794
+RPC           : 855
+空包 PTC      : 20
+客户端协议    : 978
+走游戏网关    : 609（C<->G / C<->T）
+老协议(名字判): 80
+方向未知      : 0
+RPC 实现宏    : 411
+
+== 按方向 ==
+C->G       355   (client -> gameserver)
+G->C       241   (gameserver -> client)
+C->M       205   (client -> masterserver)
+M->G       125   (masterserver -> gameserver)
+M->C        97   (masterserver -> client)
+G->M        92   (gameserver -> masterserver)
+M->D        46   (masterserver -> dbserver)
+P->M        43   (proxyserver -> masterserver)
+C->J        27   (client -> ?)
+M->N        19   (masterserver -> nameserver)
+J->M        19   (? -> masterserver)
+M->F        16   (masterserver -> fmserver)
+M->H        15   (masterserver -> ?)
+N->G        15   (nameserver -> gameserver)
+M->J        14   (masterserver -> ?)
+P->I        12   (proxyserver -> idipserver)
+G->N        11   (gameserver -> nameserver)
+C->N        10   (client -> nameserver)
+G->T        10   (gameserver -> gateserver)
+J->D        10   (? -> dbserver)
+N->D        10   (nameserver -> dbserver)
+M->T         9   (masterserver -> gateserver)
+G->E         8   (gameserver -> payserver)
+M->A         8   (masterserver -> audioserver)
+T->C         8   (gateserver -> client)
+O->M         7   (? -> masterserver)
+H->M         7   (? -> masterserver)
+G->D         7   (gameserver -> dbserver)
+N->I         7   (nameserver -> idipserver)
+N->M         6   (nameserver -> masterserver)
+I->M         6   (idipserver -> masterserver)
+F->M         6   (fmserver -> masterserver)
+K->G         6   (worldserver -> gameserver)
+E->D         6   (payserver -> dbserver)
+G->J         6   (gameserver -> ?)
+J->C         6   (? -> client)
+M->I         6   (masterserver -> idipserver)
+A->D         5   (audioserver -> dbserver)
+B->M         5   (battleserver -> masterserver)
+C->I         5   (client -> idipserver)
+C->T         5   (client -> gateserver)
+E->C         5   (payserver -> client)
+G->H         5   (gameserver -> ?)
+M->B         5   (masterserver -> battleserver)
+K->M         4   (worldserver -> masterserver)
+E->G         4   (payserver -> gameserver)
+I->N         4   (idipserver -> nameserver)
+N->T         4   (nameserver -> gateserver)
+N->R         3   (nameserver -> routerserver)
+M->K         3   (masterserver -> worldserver)
+C->E         3   (client -> payserver)
+C->H         3   (client -> ?)
+D->N         3   (dbserver -> nameserver)
+G->K         3   (gameserver -> worldserver)
+H->D         3   (? -> dbserver)
+N->U         3   (nameserver -> ?)
+T->G         3   (gateserver -> gameserver)
+T->N         3   (gateserver -> nameserver)
+C->A         2   (client -> audioserver)
+S->M         2   (? -> masterserver)
+M->S         2   (masterserver -> ?)
+C->V         2   (client -> ?)
+E->I         2   (payserver -> idipserver)
+M->E         2   (masterserver -> payserver)
+M->P         2   (masterserver -> proxyserver)
+N->C         2   (nameserver -> client)
+N->X         2   (nameserver -> ?)
+P->E         2   (proxyserver -> payserver)
+P->G         2   (proxyserver -> gameserver)
+R->G         2   (routerserver -> gameserver)
+T->M         2   (gateserver -> masterserver)
+X->N         2   (? -> nameserver)
+A->S         1   (audioserver -> ?)
+O->F         1   (? -> fmserver)
+M->L         1   (masterserver -> logserver)
+A->L         1   (audioserver -> logserver)
+G->G         1   (gameserver -> gameserver)
+K->H         1   (worldserver -> ?)
+O->V         1   (? -> ?)
+O->K         1   (? -> worldserver)
+A->C         1   (audioserver -> client)
+D->L         1   (dbserver -> logserver)
+A->N         1   (audioserver -> nameserver)
+C->O         1   (client -> ?)
+D->R         1   (dbserver -> routerserver)
+E->M         1   (payserver -> masterserver)
+E->P         1   (payserver -> proxyserver)
+G->A         1   (gameserver -> audioserver)
+G->R         1   (gameserver -> routerserver)
+G->W         1   (gameserver -> ?)
+H->N         1   (? -> nameserver)
+I->K         1   (idipserver -> worldserver)
+I->P         1   (idipserver -> proxyserver)
+J->A         1   (? -> audioserver)
+J->G         1   (? -> gameserver)
+J->N         1   (? -> nameserver)
+K->R         1   (worldserver -> routerserver)
+M->R         1   (masterserver -> routerserver)
+N->A         1   (nameserver -> audioserver)
+N->E         1   (nameserver -> payserver)
+N->H         1   (nameserver -> ?)
+N->J         1   (nameserver -> ?)
+R->K         1   (routerserver -> worldserver)
+R->M         1   (routerserver -> masterserver)
+R->N         1   (routerserver -> nameserver)
+T->D         1   (gateserver -> dbserver)
+T->E         1   (gateserver -> payserver)
+T->H         1   (gateserver -> ?)
+T->J         1   (gateserver -> ?)
+T->R         1   (gateserver -> routerserver)
+X->M         1   (? -> masterserver)
+
+== 客户端协议细分 ==
+C->G       355
+G->C       241
+C->M       205
+M->C        97
+C->J        27
+C->N        10
+T->C         8
+J->C         6
+C->I         5
+C->T         5
+E->C         5
+C->E         3
+C->H         3
+C->A         2
+C->V         2
+N->C         2
+A->C         1
+C->O         1
+
+== 按模块 Top 15 ==
+common                 153
+guild                  134
+item                   115
+scene                  101
+role                    96
+team                    84
+idip                    76
+dungeons                72
+activity                55
+chat                    46
+pay                     41
+action                  39
+login                   38
+task                    33
+guild_dinner            33
+
+== 空包 PTC（20）==
+PTCC2M_APPLYFORCAPTAINNTF
+PTCC2M_INVITETOBEFOLLOWED
+PTCC2M_STOPFOLLOW
+PTCC2T_KEEPALIVEPINGACK
+PTCE2C_PAYPARAMETERINFOINVALIDNTF
+PTCG2C_DUNGEONSPROMPTDISABLE
+PTCG2C_GARBAGECOLLECTNTF
+PTCG2C_GUIDEDISABLE
+PTCG2C_GUILDDINNERCREAMMELEEEND
+PTCG2C_GUILDDINNERCREAMMELEESTART
+PTCG2C_HSDUNGEONSONEROUNDOVER
+PTCG2C_MONSTERTREASUREDELNTF
+PTCG2M_RELOADVERSIONNTF
+PTCM2B_NOTIFYBATTLEFIELDSTARTTOBT
+PTCM2C_CREATETEAMNTF
+PTCM2C_INVITETOFOLLOWCAPTAINNTF
+PTCM2C_PAYPARAMETERINFOINVALIDNTF
+PTCM2C_STOPFOLLOWMS
+PTCN2C_SWITCHSCENEFAIL
+PTCT2C_KEEPALIVEPINGREQ
+
+== 老协议，方向取自名字前缀（80）==
+PTCA2C_AUDIOAIDNTF
+PTCA2D_REGISTERAUDIOSERVER
+PTCA2L_AUDIOLOGNOTIFY
+PTCC2G_CASTSKILL
+PTCC2M_ROLESTATEREPORTNEW
+PTCC2N_UPDATESTARTUPTYPENTF
+PTCD2L_DBLOGNOTIFY
+PTCF2M_AUDIOCHANNELTOMS
+PTCF2M_FMLARGEROOMCLOSEPARMNTF
+PTCF2M_FMMASTERINFONTF
+PTCF2M_FMWHITELISTRELOADNTF
+PTCF2M_FMWHITEROLENTF
+PTCF2M_LARGEROOMRADIONTF
+PTCG2C_CDCALL
+PTCG2C_CORRECTPOSITION
+PTCG2C_DROPITEMNTF
+PTCG2C_DUNGEONSPROMPTDISABLE
+PTCG2C_GETONVEHICLENOTIFY
+PTCG2C_SCENEDELIVERNOTIFY
+PTCG2C_SKILLRESULT
+PTCG2C_SYNCACTIONNOTIFY
+PTCG2C_SYNCSKILLDATA
+PTCG2C_TAKEVEHICLENOTIFY
+PTCG2C_TASKACCEPTABLEUPDATE
+PTCG2C_TASKFINISHEDUPDATE
+PTCG2G_NOTIFYDUNGEONSENCOURAGE
+PTCG2M_MSCRASHRECOVERG2M
+PTCG2M_RELOADVERSIONNTF
+PTCG2M_ROLELOGINDATA
+PTCG2M_ROLELOGINRECONNECTNTF
+PTCG2M_UPDATEGLOBALVALUE
+PTCH2M_TEAMTRANTS2MS
+PTCI2M_DELBANACCOUNTNTF
+PTCK2G_SERVERCROSSDATAW2CROSSG
+PTCK2G_SYNCSERVERTIME2CROSSGS
+PTCK2H_SERVERCROSSDATAW2T
+PTCK2M_SYNCSERVERTIME2MS
+PTCM2F_AUDIOCHANNELTOFM
+PTCM2F_FMSHOWNTF
+PTCM2F_LEAVEFMLARGEROOM
+PTCM2F_REGISTFMSERVER
+PTCM2G_MSDESTORYSCENE
+PTCM2G_SYNCSERVERTIME
+PTCM2H_TEAMTRANMS2TS
+PTCM2K_REPORTROLESUMMARY2WORLD
+PTCM2L_MSLOGNOTIFY
+PTCN2G_UPDATEFUNCTIONOPEN2GS
+PTCN2M_UPDATEFUNCTIONOPEN2MS
+PTCN2R_NSCLOSENTF
+PTCP2I_PUNISHACCOUNTNTF
+PTCP2I_UPDATEPLATNOTICELOGINNTF
+PTCP2M_KICKACCOUNTNTF
+PTCP2M_UPDATEPLATNOTICEMSNTF
+PTCS2M_TEAMREQUESTPLATFREINDCONFIRM
+RPCA2S_REGISTERAUDIOTOCENTER
+RPCC2A_GETAUDIOLISTREQ
+RPCC2A_UPLOADAUDIOREQ
+RPCC2G_DOENTERSCENEARG
+RPCC2G_GETMVPINFO
+RPCC2G_GETMVPRANKINFO
+RPCC2G_GETONVEHICLEASK
+RPCH2M_TEAMTRANTS2MS
+RPCK2G_CROSSGSRELOAD
+RPCM2D_DBRELOAD
+RPCM2D_READACCOUNTDATA
+RPCM2F_UPJOINFMROOM
+RPCM2G_GSRELOAD
+RPCM2H_REGISTERMS2TEAM
+RPCM2H_TEAMTRANMS2TS
+RPCM2N_KICKACCOUNTFROMMS
+RPCM2N_NSRELOAD
+RPCM2S_REGISTERMS2CS
+RPCM2S_TEAMREQUESTPLATFREINDM2S
+RPCO2F_GMTOOLCOMMAND2FM
+RPCO2K_GMTOOLCOMMAND2WORLD
+RPCO2M_GMTOOLCOMMAND2MS
+RPCO2V_GMTOOLCOMMAND2VERSION
+RPCP2I_LOGINHTTPCOMMAND
+RPCP2M_GMHTTPCOMMANDNEW
+RPCS2M_TEAMREQUESTPLATFREINDS2M
+
+== 复用消息（同一 pb 消息被多个协议引用，151）==
+KKSG.NullArg                             25
+KKSG.RegistServer                        12
+KKSG.LocalGMCmdArg                       11
+KKSG.GMCommonArg                         11
+KKSG.GMToolCommandArg                    8
+KKSG.SyncGameTimeData                    8
+KKSG.UserID                              7
+KKSG.DBConnectListenInfo                 7
+KKSG.ChatInfo                            5
+KKSG.DoubleActiveApplyArg                5
+KKSG.TeamTransData                       4
+KKSG.ChangeRoleNameArg                   4
+KKSG.EmptyMsg                            4
+KKSG.RoleIdData                          4
+KKSG.ErrorInfo                           4
+KKSG.LogOutData                          4
+KKSG.ServerSyncInfo                      4
+KKSG.LogMsg                              3
+KKSG.ReadAccountDataArg                  3
+KKSG.DungeonsEncourageData               3
+KKSG.SyncServerTime                      3
+KKSG.RandomNavigateArg                   3
+KKSG.MerchantEventPreBuyArg              3
+KKSG.MerchantShopSellArg                 3
+KKSG.MerchantEventBuyArg                 3
+KKSG.MerchantShopBuyArg                  3
+KKSG.ChatMsg                             3
+KKSG.RoleGuildInfo                       3
+KKSG.PushLeaderBoardDataArg              3
+KKSG.EnterSceneReqToMsData               3
+
+== 自检 ==
+OK: id 唯一，RPC req/res 完整，客户端协议 req 完整
+WARN: 跳过（无法识别）: roserver/protocol/pb/enumc_activity.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/enumc_attr.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/enumc_games.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/enumc_guild.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/enumc_task.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/enumc_team.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/enumc_unclassified.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_achievement.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_activity.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_auction.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_auth.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_battle.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_bigwolrd.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_chat.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_chat_room.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_common.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_count.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_dungeon.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_friend.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_gamelib.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_games.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_gift.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_gm.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_guide.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_guild.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_guild_dinner.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_item.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_magic_paper.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_mail.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_mall.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_medal.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_mercenary.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_merchant.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_network.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_pay.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_push_message.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_rank.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_red_envelope.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_returnprize.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_role.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_scene.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_scene_event.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_server.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_stall.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_sticker.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_system_open.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_task.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_team.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_theme_party.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_title.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_trade.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_unclassified.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_watch.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_weather.pb.h
+WARN: 跳过（无法识别）: roserver/protocol/pb/pbc_worldevent.pb.h

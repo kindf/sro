@@ -1,0 +1,19 @@
+﻿== 配置表资产盘点 ==
+表名总数            : 493
+Lua 访问器          : 445
+CSV                 : 489
+ServerBytes         : 403
+GameBytes           : 403
+三套齐全            : 378
+CSV + Bytes         : 402
+只有 CSV            : 87
+只有 Bytes          : 1
+只有 Lua（无数据）  : 3
+CSV 重名            : 0
+
+== Lua 类型 ==
+accessor     443
+module       2
+
+== CSV 重名 ==
+(none)
