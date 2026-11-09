@@ -3,6 +3,7 @@ local Handler = require "world.world_service_handler"
 local ServiceHelper = require "common.service_helper"
 require "skynet.manager" -- import skynet.abort
 require "skynet.queue"
+require "world.client_handler"
 
 package.path = package.path .. ';./lualib/world/?.lua'
 
@@ -16,8 +17,8 @@ skynet.register_protocol {
 	name = "client",
 	id = skynet.PTYPE_CLIENT,
 	unpack = Handler.ClientUnpack,
-	dispatch = function (_, _, msgIdx, msgName, pbMsg, netMsg, rawMsg, ...)
-		PlayerQueue(Handler.ClientDispatch, msgIdx, msgName, pbMsg, netMsg, rawMsg, ...)
+	dispatch = function (fd, _, protoId, msgName, pbMsg, netMsg, rawMsg, ...)
+		PlayerQueue(Handler.ClientDispatch, fd, protoId, msgName, pbMsg, netMsg, rawMsg, ...)
 	end
 }
 

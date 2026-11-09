@@ -1,7 +1,7 @@
 local skynet = require "skynet"
 local ServiceLauncher = require "common.service_launcher"
 
-local function startGate()
+local function startWatchdog()
     local port = skynet.getenv("gateport")
     local maxclient = skynet.getenv("maxclient")
     ServiceLauncher.Start("watchdog_service", {
@@ -14,8 +14,12 @@ end
 local function start()
     -- 配置服务
     -- ServiceLauncher.Start("config_service")
+
+    -- 先起 world，保证 watchdog 接受连接时 .world 已注册
+    ServiceLauncher.Start("world_service")
+
     -- 网关服务
-    startGate()
+    startWatchdog()
 end
 
 local traceback = debug.traceback

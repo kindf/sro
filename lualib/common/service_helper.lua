@@ -17,18 +17,4 @@ function ServiceHelper.DispatchCmd(cmd, ...)
     skynet.ret(skynet.pack(pcall(f, ...)))
 end
 
--- 分发
-function ServiceHelper.ClientDispatch(id, flag, tag, body, ...)
-
-end
-
--- 解包
-function ServiceHelper.ClientUnpack(msg, sz)
-    local id, flag, tag, body = HeadCodec.Decode(msg, sz)
-    if not id then
-        return nil, "invalid head"
-    end
-    return id, flag, tag, body
-end
-
 return ServiceHelper

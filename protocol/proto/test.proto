@@ -1,15 +1,10 @@
-syntax = "proto3";
+syntax = "proto2";
 package test;
 
-message Test {
-    string name = 1;
-    int32 age = 2;
-}
-
 message ReqTest {
-    Test test = 1;
+    required int32 test = 1;
 }
 
 message RespTest {
-    Test test = 1;
+    required int32 test = 1;
 }

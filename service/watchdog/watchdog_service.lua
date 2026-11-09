@@ -4,8 +4,6 @@ require "skynet.manager" -- import skynet.abort
 
 package.path = package.path .. ';./lualib/watchdog/?.lua'
 
-local gate
-
 local SOCKET = Handler.Socket
 local CMD = Handler.CMD
 
@@ -22,6 +20,6 @@ skynet.start(function()
 	end)
 
     skynet.register(".watchdog")
-	gate = skynet.newservice("gate")
+	local gate = skynet.newservice("gate")
     Handler.SetGate(gate)
 end)

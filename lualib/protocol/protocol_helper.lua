@@ -22,6 +22,7 @@ function ProtocolHelper.RegisterRpcHandler(reqName, respName, handler)
     protocolHandler[protoId] = {
         handler = handler,
         type = "rpc",
+        respName = respName,
         respProtoId = respProtoId,
     }
 end

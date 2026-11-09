@@ -8,8 +8,8 @@ local CMD = {}
 
 local tostring = tostring
 
-function Handler.SetGate(gate)
-    gate = gate
+function Handler.SetGate(gateaddr)
+    gate = gateaddr
 end
 
 function CMD.start(conf)
@@ -19,14 +19,17 @@ end
 
 function Socket.open(fd, addr)
     Logger.Info("[WatchDog]open New client from:%s fd:%s",addr, tostring(fd))
+    skynet.call(".world", "lua", "accept_client", fd, addr)
     skynet.call(gate, "lua", "accept", fd)
 end
 
 function Socket.close(fd)
+    skynet.send(".world", "lua", "player_socket_close", fd)
     Logger.Info("[WatchDog]Socket close fd:%s", tostring(fd))
 end
 
 function Socket.error(fd, msg)
+    skynet.send(".world", "lua", "player_socket_error", fd)
     Logger.Warning( "[WatchDog]Socket error fd:%s, msg:%s", tostring(fd), tostring(msg))
 end
 

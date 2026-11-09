@@ -8,8 +8,9 @@ snax = root.."service/?.lua"
 local configservice = root.."service/config/?.lua;"
 local gameservice = root.."service/game/?.lua;"
 local watchdogservice = root.."service/watchdog/?.lua;"
+local worldservice = root.."service/world/?.lua;"
 
-luaservice = root.."skynet/service/?.lua;"..configservice..gameservice..watchdogservice
+luaservice = root.."skynet/service/?.lua;"..configservice..gameservice..watchdogservice..worldservice
 
 lualoader = root .. "skynet/lualib/loader.lua"
 
