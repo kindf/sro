@@ -2,7 +2,7 @@
 all : help
 
 help:
-	@echo "make allstart: 启动所有节点"
+	@echo "make allstart: 启动所有节�?
 	@echo "make gamestart: 启动game节点"
 	@echo "make batlestart: 启动战斗节点"
 	@echo "make gatestart: 启动网关节点"
@@ -30,3 +30,6 @@ clientstart:
 proto:
 	sh tool/proto.sh
 	sh tool/gen_pids.sh
+
+configtest:
+	./skynet/skynet etc/config.configtest

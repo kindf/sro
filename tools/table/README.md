@@ -23,7 +23,7 @@ gen_table_schema.py 访问器 → table_schema.json（字段名/类型/列号）
       ↓
 ro_bytes.py         .bytes → Python 结构（数据 + 类型 + 行）
       ↓
-gen_table_data.py   生成 sro/gamedata/*.lua
+gen_table_data.py   生成 sro/gamedata/generated/*.lua
 ```
 
 ### 1. scan_tables.py —— 四套来源对账
@@ -66,7 +66,18 @@ uint32 row_count, rows...
 python sro\tools\table\gen_table_data.py --root F:\RO
 ```
 
-输出到 `sro/gamedata/`：398 张表、109,361 行、38.8MB。
+输出到 `sro/gamedata/generated/`：398 张表、109,361 行、38.8MB。
+
+文件名统一为 `tb` + 原表名小写（`SceneTable` → `tbscenetable.lua`），
+同时生成 `allconfigfiles.lua` 列出全部文件：
+
+```lua
+return {
+    "tbaccessorytable",
+    "tbachievementbadgetable",
+    ...
+}
+```
 
 文件格式：
 
