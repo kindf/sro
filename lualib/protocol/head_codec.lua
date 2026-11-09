@@ -2,7 +2,7 @@
 -- 客户端协议头编解码。
 --
 -- 线上格式（长度由 skynet netpack 负责，这里只处理长度之后的 payload）：
---   cmd(4, LE) + flag(1) + [tag(4, LE)] + body
+--   id(4, LE) + flag(1) + [tag(4, LE)] + body
 --
 -- encode 返回整包：2B 大端长度 + 上面的 payload；发送用 socket.write(fd, packet)。
 -- decode 收 netpack 去长度后的 payload，或 (lightuserdata, size)。
@@ -28,21 +28,21 @@ end
 
 -- 编码。
 -- 参数 body: 包体字符串。
--- 参数 cmd: 协议号，4 字节小端。
+-- 参数 id: 协议号，4 字节小端。
 -- 参数 flag: 1 字节标志。
 -- 参数 tag: RPC 时必填，4 字节小端。
 -- 返回：整包字符串；失败 nil, err。
-function HeadCodec.Encode(body, cmd, flag, tag)
+function HeadCodec.Encode(body, id, flag, tag)
     body = body or ""
     flag = flag or 0
 
-    if type(cmd) ~= "number" or cmd < 0 or cmd > 0xFFFFFFFF then
-        return nil, "invalid cmd"
+    if type(id) ~= "number" or id < 0 or id > 0xFFFFFFFF then
+        return nil, "invalid id"
     end
     if flag < 0 or flag > 0xFF then
         return nil, "invalid flag"
     end
-    cmd = math.floor(cmd)
+    id = math.floor(id)
     flag = math.floor(flag)
 
     local head
@@ -51,9 +51,9 @@ function HeadCodec.Encode(body, cmd, flag, tag)
             return nil, "rpc without valid tag"
         end
         tag = math.floor(tag)
-        head = string.pack("<I4I1I4", cmd, flag, tag)
+        head = string.pack("<I4I1I4", id, flag, tag)
     else
-        head = string.pack("<I4I1", cmd, flag)
+        head = string.pack("<I4I1", id, flag)
     end
 
     local ok, packet = pcall(string.pack, ">s2", head .. body)
@@ -66,7 +66,7 @@ end
 -- 解码。
 -- 参数 buffer: netpack 去长度后的 payload 字符串，或 lightuserdata。
 -- 参数 sz: buffer 是 lightuserdata 时必填；是字符串时可省略。
--- 返回：cmd, flag, tag, body；失败 nil, err。
+-- 返回：id, flag, tag, body；失败 nil, err。
 function HeadCodec.Decode(buffer, sz)
     if type(buffer) ~= "string" then
         local np = getNetpack()
@@ -83,7 +83,7 @@ function HeadCodec.Decode(buffer, sz)
         return nil, "packet too short"
     end
 
-    local cmd, flag = string.unpack("<I4I1", buffer)
+    local id, flag = string.unpack("<I4I1", buffer)
     local tag, body
 
     if flag % 2 == FLAG_RPC then
@@ -96,7 +96,7 @@ function HeadCodec.Decode(buffer, sz)
         body = string.sub(buffer, 6, len)
     end
 
-    return cmd, flag, tag, body
+    return id, flag, tag, body
 end
 
 HeadCodec.FLAG_RPC = FLAG_RPC

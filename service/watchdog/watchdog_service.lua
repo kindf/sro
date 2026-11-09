@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local Handler = require "watchdog.service_handler"
+local Handler = require "watchdog.watchdog_service_handler"
 require "skynet.manager" -- import skynet.abort
 
 package.path = package.path .. ';./lualib/watchdog/?.lua'
