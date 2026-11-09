@@ -1,14 +1,14 @@
 #!/bin/bash
 
-# 配置你的protobuf文件的目录
-PROTO_DIR="proto/proto"
+# 仅用于新 sro 协议（c2s_/s2c_ 命名）；RO 迁移协议不要跑本脚本
+PROTO_DIR="protocol/proto"
 
 # 输出的Lua文件
-LUA_OUTPUT_FILE="proto/pids.lua"
-LUA_OUTPUT_FILE2="proto/serverpids.lua"
+LUA_OUTPUT_FILE="protocol/pids.lua"
+LUA_OUTPUT_FILE2="protocol/serverpids.lua"
 
 # 临时文件存储之前生成的ID和哈希
-TEMP_ID_FILE="proto/temp_ids.txt"
+TEMP_ID_FILE="protocol/temp_ids.txt"
 
 # 客户端和服务器的消息匹配关键字
 CLIENT_PROTO_MATCH_KEY=c2s_
