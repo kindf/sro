@@ -21,6 +21,7 @@ function CMD.accept_client(fd, addr)
     if not player then
         player = PlayerLoader.LoadPlayer(fd, addr)
         PlayerManager.GetInstance():AddPlayer(player.uid, player)
+        player:OnBorn()
     end
 end
 
@@ -44,7 +45,10 @@ function Handler.ClientDispatch(fd, id, flag, tag, body, ...)
     if not protoName then
         return Logger.Error("[World]ClientDispatch: unknown protoId:%s fd:%s", tostring(id), tostring(fd))
     end
-    local msg = pb.decode(protoName, body)
+    local ok, msg = pcall(pb.decode, protoName, body)
+    if not ok then
+        return Logger.Error("[World]ClientDispatch: failed to decode message fd:%s, protoId:%s", tostring(fd), tostring(id))
+    end
     local handler = ProtocolHelper.GetProtocolHandler(id)
     if not handler then
         return Logger.Error("协议处理函数不存在 protoId:%s", id)

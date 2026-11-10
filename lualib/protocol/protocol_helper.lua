@@ -7,7 +7,8 @@ local ProtocolHelper = {}
 local sformat = string.format
 
 local protocolHandler = {}
-function ProtocolHelper.RegisterProtocolHandler(protoId, handler)
+function ProtocolHelper.RegisterPTCHandler(name, handler)
+    local protoId = assert(Pids[name], sformat("不存在的消息 name:%s", name))
     assert(not protocolHandler[protoId], "协议处理函数重复注册 pid:"..protoId)
     protocolHandler[protoId] = {
         handler = handler,
@@ -15,7 +16,7 @@ function ProtocolHelper.RegisterProtocolHandler(protoId, handler)
     }
 end
 
-function ProtocolHelper.RegisterRpcHandler(reqName, respName, handler)
+function ProtocolHelper.RegisterRPCHandler(reqName, respName, handler)
     local protoId = assert(Pids[reqName], sformat("不存在的消息 reqName:%s", reqName))
     local respProtoId = assert(Pids[respName], sformat("不存在的消息 respName:%s", respName))
     assert(not protocolHandler[protoId], "协议处理函数重复注册 pid:"..protoId)
@@ -51,6 +52,16 @@ function ProtocolHelper.Encode(respName, resp, flag, tag)
 
     local id = assert(Pids[respName], sformat("不存在的消息 respName:%s", respName))
     local packet, err = HeadCodec.Encode(body, id, flag or 0, tag)
+    assert(packet, sformat("消息打包失败 err:%s", tostring(err)))
+    return packet
+end
+
+function ProtocolHelper.EncodePTCPacket(respName, resp)
+    local ok, body = pcall(Pb.encode, respName, resp)
+    assert(ok, sformat("消息编码失败 err:%s", tostring(body)))
+
+    local id = assert(Pids[respName], sformat("不存在的消息 respName:%s", respName))
+    local packet, err = HeadCodec.Encode(body, id,  0, 0)
     assert(packet, sformat("消息打包失败 err:%s", tostring(err)))
     return packet
 end

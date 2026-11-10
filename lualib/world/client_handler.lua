@@ -2,8 +2,8 @@ local Logger = require "common.logger"
 local ProtocolHelper = require "protocol.protocol_helper"
 
 ---@param player Player
-local function ReqTest(player, req, resp)
-    Logger.Info("[ClientHandler]ReqTest: uid:%s, msg:%s", tostring(player.uid), tostring(req.test))
-    resp.test = req.test
+local function ReqMove(player, req)
+    Logger.Info("[ClientHandler]ReqMove: uid:%s, msg:%s", tostring(player.uid), tostring(req))
+    player:ReqMove(req)
 end
-ProtocolHelper.RegisterRpcHandler("test.ReqTest", "test.RespTest", ReqTest)
+ProtocolHelper.RegisterPTCHandler("Scene.ReqMove", ReqMove)

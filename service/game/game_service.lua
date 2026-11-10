@@ -14,10 +14,10 @@ end
 local function start()
     -- 配置服务
     -- ServiceLauncher.Start("config_service")
-
-    -- 先起 world，保证 watchdog 接受连接时 .world 已注册
+    -- 世界服务
     ServiceLauncher.Start("world_service")
-
+    -- 场景服务
+    ServiceLauncher.Start("scene_service")
     -- 网关服务
     startWatchdog()
 end

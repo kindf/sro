@@ -1,0 +1,18 @@
+syntax = "proto2";
+package Scene;
+
+message ReqMove {
+    required int32 common = 1;
+    required float time = 2;
+    required float dx = 3;
+    required float dy = 4;
+    required float dz = 5;
+}
+
+message RespMove {
+    required int32 common = 1;
+    required float time = 2;
+    required float dx = 3;
+    required float dy = 4;
+    required float dz = 5;
+}
