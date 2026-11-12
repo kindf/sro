@@ -47,17 +47,11 @@ function Player:ReqMove(req)
         dz = dz,
         time = time
     })
-    if not ret then
+    if not ret or not moveContent then
         Logger.Warning("[Player]ReqMove failed, move operation failed. uid:%s, reason:%s", self.uid, moveContent)
         return
     end
-    if moveContent then
-        resp.common = face | moving << 30 | sceneId << 16
-        resp.time = moveContent.time
-        resp.dx = moveContent.dx
-        resp.dy = moveContent.dy
-        resp.dz = moveContent.dz
-    end
+    resp.dx, resp.dy, resp.dz, resp.time, resp.forced, resp.common = moveContent.dx, moveContent.dy, moveContent.dz, moveContent.time, moveContent.forced, common
     
     local packet = ProtocolHelper.EncodePTCPacket("Scene.RespMove", resp)
     self:SendPackage(packet)

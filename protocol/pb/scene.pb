@@ -1,15 +1,16 @@
 
-ã
+û
 scene.protoScene"e
 ReqMove
 common (Rcommon
 time (Rtime
 dx (Rdx
 dy (Rdy
-dz (Rdz"f
+dz (Rdz"~
 RespMove
 common (Rcommon
 time (Rtime
 dx (Rdx
 dy (Rdy
-dz (Rdz
+dz (Rdz
+forced (Rforced

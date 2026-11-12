@@ -8,6 +8,7 @@ local Class = require "common.class"
 ---@field face number
 ---@field moving boolean
 ---@field lastMoveAt number
+---@field token number
 local SceneUnit = Class("SceneUnit")
 
 function SceneUnit:Ctor()
@@ -18,6 +19,7 @@ function SceneUnit:Ctor()
     self.face = 0
     self.moving = false
     self.lastMoveAt = nil
+    self.token = 0
 end
 
 return SceneUnit

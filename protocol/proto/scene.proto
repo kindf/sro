@@ -15,4 +15,5 @@ message RespMove {
     required float dx = 3;
     required float dy = 4;
     required float dz = 5;
+    optional bool forced = 6;   // true: server forced back
 }
