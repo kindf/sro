@@ -59,6 +59,14 @@ function PlayerManager:GetPlayerByFd(fd)
     return self.playersFdMap[fd]
 end
 
+function PlayerManager:Broadcast(packet, exceptUids)
+    for uid, player in pairs(self.playersUidMap) do
+        if not exceptUids or not exceptUids[uid] then
+            player:SendPackage(packet)
+        end
+    end
+end
+
 ---@type PlayerManager
 local GPlayerManager
 function PlayerManager.GetInstance()

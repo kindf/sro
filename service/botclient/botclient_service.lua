@@ -90,7 +90,7 @@ local function DoSomething()
     C2S(loginFd, "Scene.ReqMove", {
         common = 90,
         time = 0.1,
-        dx = 1000,
+        dx = 10,
         dy = 0,
         dz = 20,
     }, function(resp)

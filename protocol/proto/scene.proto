@@ -16,4 +16,5 @@ message RespMove {
     required float dy = 4;
     required float dz = 5;
     optional bool forced = 6;   // true: server forced back
+    optional uint64 uid = 7;    // 移动的玩家 uid，广播时用于区分是谁
 }

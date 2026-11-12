@@ -54,7 +54,7 @@ function Player:ReqMove(req)
     resp.dx, resp.dy, resp.dz, resp.time, resp.forced, resp.common = moveContent.dx, moveContent.dy, moveContent.dz, moveContent.time, moveContent.forced, common
     
     local packet = ProtocolHelper.EncodePTCPacket("Scene.RespMove", resp)
-    self:SendPackage(packet)
+    return packet, resp.forced
 end
 
 return Player
