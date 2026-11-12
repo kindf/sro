@@ -18,6 +18,9 @@ skynet.register_protocol {
 	id = skynet.PTYPE_CLIENT,
 	unpack = Handler.ClientUnpack,
 	dispatch = function (fd, _, protoId, msgName, pbMsg, netMsg, rawMsg, ...)
+		-- client 协议是单向的，session 实际是 gate 传下来的 fd，
+		-- 不调用 ignoreret 会被 skynet 当成“忘记回包”。
+		skynet.ignoreret()
 		PlayerQueue(Handler.ClientDispatch, fd, protoId, msgName, pbMsg, netMsg, rawMsg, ...)
 	end
 }

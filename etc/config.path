@@ -10,8 +10,9 @@ local gameservice = root.."service/game/?.lua;"
 local watchdogservice = root.."service/watchdog/?.lua;"
 local worldservice = root.."service/world/?.lua;"
 local sceneservice = root.."service/scene/?.lua;"
+local botclientservice = root.."service/botclient/?.lua;"
 
-luaservice = root.."skynet/service/?.lua;"..configservice..gameservice..watchdogservice..worldservice..sceneservice
+luaservice = root.."skynet/service/?.lua;"..configservice..gameservice..watchdogservice..worldservice..sceneservice..botclientservice
 
 lualoader = root .. "skynet/lualib/loader.lua"
 

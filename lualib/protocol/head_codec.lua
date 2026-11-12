@@ -15,15 +15,15 @@ local FLAG_REQUEST = 2
 local FLAG_COMPRESS = 4
 local FLAG_KEEPALIVE = 16
 
-local netpack
+local skynet
 
--- 延迟加载 netpack：本地单测没有 skynet 也能跑。
-local function getNetpack()
-    if netpack == nil then
-        local ok, mod = pcall(require, "skynet.netpack")
-        netpack = ok and mod or false
+-- 延迟加载 skynet：字符串编解码不依赖服务运行环境。
+local function getSkynet()
+    if skynet == nil then
+        local ok, mod = pcall(require, "skynet")
+        skynet = ok and mod or false
     end
-    return netpack or nil
+    return skynet or nil
 end
 
 -- 编码。
@@ -66,15 +66,16 @@ end
 -- 解码。
 -- 参数 buffer: netpack 去长度后的 payload 字符串，或 lightuserdata。
 -- 参数 sz: buffer 是 lightuserdata 时必填；是字符串时可省略。
+-- 指针为借用的 Skynet 消息内存，只复制不释放；消息回调结束后由框架释放。
 -- 返回：id, flag, tag, body；失败 nil, err。
 function HeadCodec.Decode(buffer, sz)
     if type(buffer) ~= "string" then
-        local np = getNetpack()
-        if not np then
-            return nil, "netpack unavailable"
+        local runtime = getSkynet()
+        if not runtime then
+            return nil, "skynet unavailable"
         end
-        -- tostring 会释放 lightuserdata，调用方不要再使用 buffer
-        buffer = np.tostring(buffer, sz)
+        -- netpack.tostring 会提前释放指针，导致框架再次释放时破坏堆内存。
+        buffer = runtime.tostring(buffer, sz)
         sz = nil
     end
 

@@ -6,7 +6,7 @@ local function startWatchdog()
     local maxclient = skynet.getenv("maxclient")
     ServiceLauncher.Start("watchdog_service", {
         port = port,
-        maxclient = maxclient,
+        maxclient = tonumber(maxclient),
         nodelay = true,
     })
 end

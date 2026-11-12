@@ -5,6 +5,7 @@ local Pids = require "protocol.pids"
 local pb = require "pb"
 local PlayerManager = require "world.player.player_manager"
 local PlayerLoader = require "world.player.player_loader"
+local skynet = require "skynet"
 
 local Handler = {}
 
@@ -23,14 +24,23 @@ function CMD.accept_client(fd, addr)
         PlayerManager.GetInstance():AddPlayer(player.uid, player)
         player:OnBorn()
     end
+    return skynet.self()
 end
 
 function CMD.player_socket_close(fd)
+    local player = PlayerManager.GetInstance():GetPlayerByFd(fd)
+    if player then
+        skynet.send(".scene", "lua", "leave", player.uid)
+    end
     PlayerManager.GetInstance():PlayerSocketClose(fd)
     Logger.Info("[World]Socket close fd:%s", tostring(fd))
 end
 
 function CMD.player_socket_error(fd)
+    local player = PlayerManager.GetInstance():GetPlayerByFd(fd)
+    if player then
+        skynet.send(".scene", "lua", "leave", player.uid)
+    end
     PlayerManager.GetInstance():PlayerSocketError(fd)
     Logger.Info( "[World]Socket error fd:%s", tostring(fd))
 end

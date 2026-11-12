@@ -1,0 +1,13 @@
+include "config.path"
+-- 线程个数
+thread = 8
+
+-- 启动配置
+bootstrap = "snlua bootstrap"   -- The service for bootstrap
+start = "botclient_service"  -- main script
+
+harbor = 0
+
+luaservice = luaservice..root.."service/botclient/?.lua;"
+
+gateport = 9000

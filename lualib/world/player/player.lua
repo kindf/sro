@@ -25,7 +25,10 @@ function Player:SendPackage(package)
         Logger.Warning("[Player]SendPackage failed, fd is nil. uid:%s", self.uid)
         return
     end
-    socket.write(self.fd, package)
+    local ok, err = pcall(socket.write, self.fd, package)
+    if not ok then
+        Logger.Warning("[Player]SendPackage failed, fd:%s uid:%s err:%s", tostring(self.fd), tostring(self.uid), tostring(err))
+    end
 end
 
 function Player:ReqMove(req)
