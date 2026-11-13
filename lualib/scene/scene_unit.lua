@@ -32,7 +32,7 @@ function SceneUnit:Pack()
         x = self.x,
         y = self.y,
         z = self.z,
-        face = self.face,
+        common = (self.face or 0) | (self.moving and (1 << 30) or 0),
     }
 end
 

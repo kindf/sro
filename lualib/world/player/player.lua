@@ -17,7 +17,7 @@ function Player:Ctor()
 end
 
 function Player:OnBorn()
-    local ok, unit, others = skynet.call(".scene", "lua", "enter", self.uid, 1, 0, 0, 0)
+    local ok, unit, others = skynet.call(".scene", "lua", "enter", self.uid, 4)
     if not ok then
         Logger.Error("[Player]OnBorn failed, enter scene failed. uid:%s, reason:%s", self.uid, unit)
         return
@@ -51,7 +51,8 @@ function Player:ReqMove(req)
         dx = dx,
         dy = dy,
         dz = dz,
-        time = time
+        time = time,
+        common = common,
     })
     if not ret or not moveContent then
         Logger.Warning("[Player]ReqMove failed, move operation failed. uid:%s, reason:%s", self.uid, moveContent)

@@ -1,6 +1,6 @@
 # sro/tools/table · 配置表工具链
 
-四个工具，覆盖“数据在哪 → 字段是什么 → 怎么转成 Lua”。
+五个工具，覆盖“数据在哪 → 字段是什么 → 怎么转成 Lua → 课程按需裁剪”。
 
 ## 背景
 
@@ -24,6 +24,8 @@ gen_table_schema.py 访问器 → table_schema.json（字段名/类型/列号）
 ro_bytes.py         .bytes → Python 结构（数据 + 类型 + 行）
       ↓
 gen_table_data.py   生成 sro/gamedata/generated/*.lua
+      ↓
+prune_generated.py  按 keep_tables.txt 只保留课程要用的表
 ```
 
 ### 1. scan_tables.py —— 四套来源对账
@@ -89,6 +91,24 @@ return {
 
 主键唯一时 key = 主键值；8 张复合主键表 key = 行号（文件头 `key: ordinal`）。
 
+### 5. prune_generated.py —— 课程按需裁剪
+
+```powershell
+python sro\tools\table\prune_generated.py
+```
+
+读 `sro/gamedata/keep_tables.txt`（一行一个表名，不带 `.lua`），删除清单外的
+`generated/tb*.lua`，并按清单重写 `allconfigfiles.lua`。
+
+课程当前只保留：
+
+```
+tbscenetable
+```
+
+以后要加表：重新跑 `gen_table_data.py` 生成全量，把表名加进 `keep_tables.txt`，
+再跑一次 `prune_generated.py`。
+
 ## 关键结论
 
 1. **必须按名字对齐**：CSV 有 `Comment`、`EventID` 等服务器不用的列，列号会错位。
@@ -109,4 +129,5 @@ return {
 python sro\tools\table\scan_tables.py --root F:\RO
 python sro\tools\table\gen_table_schema.py --root F:\RO
 python sro\tools\table\gen_table_data.py --root F:\RO
+python sro\tools\table\prune_generated.py
 ```

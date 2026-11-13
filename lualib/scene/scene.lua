@@ -9,6 +9,11 @@ local TOKEN_REGEN     = 1.0   -- 每秒回 1 秒
 local MAX_DT          = 0.5   -- 单次最多补 500ms
 local GRID_SIZE = 32       -- 32 米一格
 local AOI_RADIUS = 1       -- 3x3
+local DEFAULT_MAX_X = 10000 -- 默认地图尺寸
+local DEFAULT_MIN_X = -10000-- 默认地图尺寸
+local DEFAULT_MAX_Z = 10000-- 默认地图尺寸
+local DEFAULT_MIN_Z = -10000-- 默认地图尺寸
+
 
 ---@class Scene
 ---@field sceneId number
@@ -16,10 +21,24 @@ local AOI_RADIUS = 1       -- 3x3
 ---@field grids table<integer, table<integer, boolean>>
 local Scene = Class("Scene")
 
-function Scene:Ctor()
-    self.sceneId = nil
+function Scene:Ctor(cfg)
+    self.sceneId = cfg.id
     self.units = {}
     self.grids = {}
+
+    self.startPos = cfg.StartPos and cfg.StartPos[1] or {0, 0, 0}
+    self.startFace = cfg.StartFace or 0
+
+    local size = cfg.MapSize and cfg.MapSize[1] or 0
+    local offset = cfg.MapOffset and cfg.MapOffset[1] or {0, 0}
+
+    if size > 0 then
+        self.minX, self.maxX = offset[1], offset[1] + size
+        self.minZ, self.maxZ = offset[2], offset[2] + size
+    else
+        self.minX, self.maxX = -DEFAULT_MIN_X, DEFAULT_MAX_X
+        self.minZ, self.maxZ = DEFAULT_MIN_Z, DEFAULT_MAX_Z
+    end
 end
 
 function Scene:GridKey(gx, gz)
@@ -67,6 +86,9 @@ function Scene:GetNeighborSet(gx, gz)
 end
 
 function Scene:Enter(uid, x, y, z)
+    if not x then
+        x, y, z = self.startPos[1], self.startPos[2], self.startPos[3]
+    end
     local unit = SceneUnit.new()
     unit.uid = uid
     unit.x = x
@@ -131,6 +153,11 @@ function Scene:Move(uid, moveContent)
     if not _Finite(dx) or not _Finite(dy) or not _Finite(dz) or not _Finite(time) then
         return _ForcedBack(unit)
     end
+
+    if dx < self.minX or dx > self.maxX or dz < self.minZ or dz > self.maxZ then
+        return _ForcedBack(unit)
+    end
+
     time = math.max(0, math.min(2, time))
 
     local now = os.time()
@@ -168,11 +195,15 @@ function Scene:Move(uid, moveContent)
         end
     end
 
+    local common = moveContent.common
     unit.x, unit.y, unit.z = dx, dy, dz
     unit.lastMoveAt = now
     unit.token = unit.token - cost
+    unit.face = common & 0xFFFF
+    unit.moving = ((common >> 30) & 1) == 1
     self:RemoveFromGrid(unit)
     self:AddToGrid(unit)
+
     return {
         dx = dx,
         dy = dy,

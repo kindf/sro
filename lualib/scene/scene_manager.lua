@@ -1,6 +1,7 @@
 local Class = require "common.class"
 local Scene = require "scene.scene"
 local Logger = require "common.logger"
+local ConfigRepository = require "common.config_repository"
 
 ---@class SceneManager
 ---@field scenes table<integer, Scene>
@@ -13,10 +14,10 @@ function SceneManager:Ctor()
 end
 
 function SceneManager:Init()
-    self.scenes[1] = Scene.new()
+    self.scenes[1] = Scene.new(ConfigRepository.Get("tbscenetable")[1])
 end
 
-function SceneManager:EnterScene(uid, sceneId, x, y, z)
+function SceneManager:EnterScene(uid, sceneId)
     local oldScene = self.playerSceneMap[uid]
     
     local newScene = self.scenes[sceneId]
@@ -28,7 +29,7 @@ function SceneManager:EnterScene(uid, sceneId, x, y, z)
         oldScene:Leave(uid)
     end
     self:SetPlayerScene(uid, newScene)
-    return newScene:Enter(uid, x, y, z)
+    return newScene:Enter(uid, nil, nil, nil)
 end
 
 function SceneManager:LeaveScene(uid)

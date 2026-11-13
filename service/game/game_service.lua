@@ -13,7 +13,7 @@ end
 
 local function start()
     -- 配置服务
-    -- ServiceLauncher.Start("config_service")
+    ServiceLauncher.Start("config_service")
     -- 世界服务
     ServiceLauncher.Start("world_service")
     -- 场景服务

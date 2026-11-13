@@ -1,0 +1,4 @@
+# 当前保留的配置表（一行一个，不带 .lua）
+# 课程推进需要新表时，先重新生成全量，再把表名加到这里，
+# 然后跑：python sro/tools/table/prune_generated.py
+tbscenetable
