@@ -1,11 +1,13 @@
 local Player = require "world.player.player"
 local PlayerLoader = {}
+local Guid = 1
 
 function PlayerLoader.LoadPlayer(fd, addr)
     local player = Player.new()
     player.fd = fd
     player.account = addr
-    player.uid = tonumber(os.time()..fd) -- 这里使用时间戳作为uid，实际应用中应该使用更合适的方式生成唯一的uid
+    player.uid = Guid
+    Guid = Guid + 1
     return player
 end
 

@@ -60,7 +60,7 @@ function Player:ReqMove(req)
     resp.dx, resp.dy, resp.dz, resp.time, resp.forced, resp.common, resp.uid = moveContent.dx, moveContent.dy, moveContent.dz, moveContent.time, moveContent.forced, common, self.uid
     
     local packet = ProtocolHelper.EncodePTCPacket("Scene.RespMove", resp)
-    return packet, resp.forced
+    return packet, moveContent
 end
 
 return Player

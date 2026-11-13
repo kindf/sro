@@ -9,6 +9,8 @@ local Class = require "common.class"
 ---@field moving boolean
 ---@field lastMoveAt number
 ---@field token number
+---@field gx number
+---@field gz number
 local SceneUnit = Class("SceneUnit")
 
 function SceneUnit:Ctor()
@@ -20,6 +22,8 @@ function SceneUnit:Ctor()
     self.moving = false
     self.lastMoveAt = nil
     self.token = 0
+    self.gx = 0
+    self.gz = 0
 end
 
 function SceneUnit:Pack()

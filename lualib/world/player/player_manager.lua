@@ -69,7 +69,7 @@ end
 
 function PlayerManager:SendUidsPacket(uids, packet)
     for _, uid in pairs(uids) do
-        self:SendUidPacket(uid)
+        self:SendUidPacket(uid, packet)
     end
 end
 

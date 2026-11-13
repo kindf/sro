@@ -12,8 +12,6 @@ local account
 local loginFd
 local gatePort = skynet.getenv("gateport")
 
-local fd
-
 -- 服务端发包格式（HeadCodec.Encode 已经带上了 2B 长度）：
 --   [2B BE len][4B LE id][1B flag][4B LE tag?][body]
 -- socket.read 先读 2B 长度，再读 len 字节 payload，payload 交给 HeadCodec.Decode。
@@ -124,7 +122,7 @@ local function Tick()
         return Logger.Error("[C2S] recv failed")
     end
 
-    Logger.Debug("[C2S] recv id:%s flag:%s tag:%s resp:%s", Pids[tonumber(id)], tostring(flag), tostring(tag), TableUtil.dump(resp))
+    Logger.Debug("Receive Server recv id:%s flag:%s tag:%s resp:%s", Pids[tonumber(id)], tostring(flag), tostring(tag), TableUtil.dump(resp))
 end
 
 local function Start(acc)

@@ -7,15 +7,63 @@ local SPEED_TOLERANCE = 2.0   -- 允许 2 倍速度
 local TOKEN_MAX       = 2.0   -- 最多攒 2 秒
 local TOKEN_REGEN     = 1.0   -- 每秒回 1 秒
 local MAX_DT          = 0.5   -- 单次最多补 500ms
+local GRID_SIZE = 32       -- 32 米一格
+local AOI_RADIUS = 1       -- 3x3
 
 ---@class Scene
 ---@field sceneId number
 ---@field units table<integer, SceneUnit>
+---@field grids table<integer, table<integer, boolean>>
 local Scene = Class("Scene")
 
 function Scene:Ctor()
     self.sceneId = nil
     self.units = {}
+    self.grids = {}
+end
+
+function Scene:GridKey(gx, gz)
+    return gx.."_"..gz
+end
+
+---@param unit SceneUnit
+function Scene:AddToGrid(unit)
+    local gx = math.floor(unit.x / GRID_SIZE)
+    local gz = math.floor(unit.z / GRID_SIZE)
+    unit.gx, unit.gz = gx, gz
+
+    local key = self:GridKey(gx, gz)
+    local set = self.grids[key] or {}
+    set[unit.uid] = true
+    self.grids[key] = set
+end
+
+---@param unit SceneUnit
+function Scene:RemoveFromGrid(unit)
+    local key = self:GridKey(unit.gx, unit.gz)
+    local set = self.grids[key]
+    if set then
+        set[unit.uid] = nil
+        if next(set) == nil then
+            self.grids[key] = nil
+        end
+    end
+end
+
+function Scene:GetNeighborSet(gx, gz)
+    local result = {}
+    for i = gx - AOI_RADIUS, gx + AOI_RADIUS do
+        for j = gz - AOI_RADIUS, gz + AOI_RADIUS do
+            local key = self:GridKey(i, j)
+            local set = self.grids[key]
+            if set then
+                for uid in pairs(set) do
+                    result[uid] = true
+                end
+            end
+        end
+    end
+    return result
 end
 
 function Scene:Enter(uid, x, y, z)
@@ -28,11 +76,12 @@ function Scene:Enter(uid, x, y, z)
     unit.token = TOKEN_MAX
     self.units[uid] = unit
 
+    self:AddToGrid(unit)
+    local neighbors = self:GetNeighborSet(unit.gx, unit.gz)
+    neighbors[uid] = nil
     local others = {}
-    for id, u in pairs(self.units) do
-        if id ~= uid then
-            table.insert(others, {uid = id, x = u.x, y = u.y, z = u.z})
-        end
+    for id, u in pairs(neighbors) do
+        table.insert(others, self.units[id]:Pack())
     end
 
     return unit:Pack(), others
@@ -40,11 +89,20 @@ end
 
 function Scene:Leave(uid)
     local unit = self.units[uid]
+    if not unit then
+        return nil, {}
+    end
+
+    local neighbors = self:GetNeighborSet(unit.gx, unit.gz)
+    neighbors[uid] = nil
+
+    
+    self:RemoveFromGrid(unit)
     self.units[uid] = nil
 
     local others = {}
-    for id in pairs(self.units) do
-        table.insert(others, {uid = id})
+    for id, u in pairs(neighbors) do
+        table.insert(others, self.units[id]:Pack())
     end
 
     return unit and unit:Pack(), others
@@ -57,11 +115,9 @@ end
 ---@param unit SceneUnit
 local function _ForcedBack(unit)
     return {
-        dx = unit.x,
-        dy = unit.y,
-        dz = unit.z,
-        time = 0,
-        forced = true,
+        dx = unit.x, dy = unit.y, dz = unit.z,
+        time = 0, forced = true,
+        receivers = {}, enters = {}, leaves = {},
     }
 end
 
@@ -91,15 +147,41 @@ function Scene:Move(uid, moveContent)
         return _ForcedBack(unit)
     end
 
+    local oldGx, oldGz = unit.gx, unit.gz
+    local newGx, newGz = math.floor(dx / GRID_SIZE), math.floor(dz / GRID_SIZE)
+    local oldSet = self:GetNeighborSet(oldGx, oldGz)
+    local newSet = self:GetNeighborSet(newGx, newGz)
+    oldSet[unit.uid] = nil
+    newSet[unit.uid] = nil
+
+    local enters, leaves, receivers = {}, {}, {}
+    for id in pairs(newSet) do
+        if not oldSet[id] then
+            table.insert(enters, self.units[id]:Pack())
+        else
+            table.insert(receivers, id)
+        end
+    end
+    for id in pairs(oldSet) do
+        if not newSet[id] then
+            table.insert(leaves, id)
+        end
+    end
+
     unit.x, unit.y, unit.z = dx, dy, dz
     unit.lastMoveAt = now
     unit.token = unit.token - cost
+    self:RemoveFromGrid(unit)
+    self:AddToGrid(unit)
     return {
         dx = dx,
         dy = dy,
         dz = dz,
         time = time,
         forced = false,
+        receivers = receivers,
+        enters = enters,
+        leaves = leaves,
     }
 end
 
