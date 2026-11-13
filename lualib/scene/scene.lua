@@ -22,7 +22,7 @@ local DEFAULT_MIN_Z = -10000-- 默认地图尺寸
 local Scene = Class("Scene")
 
 function Scene:Ctor(cfg)
-    self.sceneId = cfg.id
+    self.sceneId = cfg.ID
     self.units = {}
     self.grids = {}
 
@@ -94,6 +94,7 @@ function Scene:Enter(uid, x, y, z)
     unit.x = x
     unit.y = y
     unit.z = z
+    unit.face = self.startFace or 0
     unit.lastMoveAt = os.time()
     unit.token = TOKEN_MAX
     self.units[uid] = unit

@@ -14,16 +14,22 @@ function Player:Ctor()
     self.fd = nil
     self.account = nil
     self.uid = nil
+    self.sceneId = 1
 end
 
-function Player:OnBorn()
-    local ok, unit, others = skynet.call(".scene", "lua", "enter", self.uid, 4)
-    if not ok then
-        Logger.Error("[Player]OnBorn failed, enter scene failed. uid:%s, reason:%s", self.uid, unit)
-        return
+function Player:ChangeScene(sceneId)
+    local ok, data = skynet.call(".scene", "lua", "change_scene", self.uid, sceneId)
+    if not ok or not data then
+        Logger.Error("[Player]ChangeScene failed. uid:%s sceneId:%s reason:%s", tostring(self.uid), tostring(sceneId), tostring(data))
+        return nil
     end
 
-    return unit, others
+    self.sceneId = sceneId
+    return data
+end
+
+function Player:OnBorn(sceneId)
+    return self:ChangeScene(sceneId or self.sceneId or 1)
 end
 
 function Player:SendPackage(package)

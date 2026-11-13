@@ -1,5 +1,5 @@
 
-Ž
+…
 scene.protoScene"e
 ReqMove
 common (Rcommon
@@ -22,4 +22,11 @@
 z (Rz
 common (Rcommon"
 	UnitLeave
-uid (Ruid
+uid (Ruid"$
+ReqEnter
+sceneId (RsceneId"O
+	RespEnter
+sceneId (RsceneId
+x (Rx
+y (Ry
+z (Rz

@@ -16,6 +16,7 @@ function CMD.start()
     return true
 end
 
+
 function CMD.player_socket_accept(fd, addr)
     Logger.Info("[World]accept New client from:%s fd:%s",addr, tostring(fd))
     return skynet.self()
@@ -30,17 +31,8 @@ function CMD.player_socket_ready(fd, addr)
     end
     player = PlayerLoader.LoadPlayer(fd, addr)
     PlayerManager.GetInstance():AddPlayer(player.uid, player)
-    local unit, others = player:OnBorn()
-    
-    -- 通知该玩家其他玩家位置
-    for _, u in pairs(others) do
-        local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitEnter", u)
-        player:SendPackage(packet)
-    end
-
-    -- 通知其他玩家该玩家位置
-    local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitEnter", unit)
-    PlayerManager.GetInstance():Broadcast(packet, { [unit.uid] = true })
+    local data = player:OnBorn()
+    ApplySceneChange(player, data, player.sceneId, false)
 end
 
 local function LeaveScene(fd, callback)
@@ -62,7 +54,6 @@ local function LeaveScene(fd, callback)
 end
 
 function CMD.player_socket_close(fd)
-    PlayerManager.GetInstance():PlayerSocketClose(fd)
     LeaveScene(fd, function()
         PlayerManager.GetInstance():PlayerSocketClose(fd)
     end)
@@ -70,7 +61,6 @@ function CMD.player_socket_close(fd)
 end
 
 function CMD.player_socket_error(fd)
-    PlayerManager.GetInstance():PlayerSocketError(fd)
     LeaveScene(fd, function()
         PlayerManager.GetInstance():PlayerSocketError(fd)
     end)

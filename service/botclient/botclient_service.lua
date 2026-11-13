@@ -81,11 +81,11 @@ local function C2S(fd, protoName, data, callback)
 end
 
 local function SendPacket(fd, protoName, data)
-    Logger.Debug("[C2S] send %s data:%s", protoName, TableUtil.dump(data))
+    Logger.Debug("[Send] send %s data:%s", protoName, TableUtil.dump(data))
 
     local packet, err = PackMsg(protoName, data, 0)
     if not packet then
-        return Logger.Error("[C2S] pack failed proto:%s err:%s", protoName, tostring(err))
+        return Logger.Error("[Send] pack failed proto:%s err:%s", protoName, tostring(err))
     end
     socket.write(fd, packet)
 end
@@ -96,17 +96,6 @@ local function DoSomething()
     -- 等 gate 把这条 fd forward 给 world，避免连接后立刻发包被丢
     skynet.sleep(10)
 
-    -- Scene.ReqMove 是 proto2 required，五个字段都要给
-    -- C2S(loginFd, "Scene.ReqMove", {
-    --     common = 90,
-    --     time = 0.1,
-    --     dx = 10,
-    --     dy = 0,
-    --     dz = 20,
-    -- }, function(resp)
-    --     Logger.Info("收到移动响应 %s", TableUtil.dump(resp))
-    -- end)
-
     SendPacket(loginFd, "Scene.ReqMove", {
         common = 90,
         time = 0.1,
@@ -114,15 +103,19 @@ local function DoSomething()
         dy = 0,
         dz = 0,
     })
+
+    SendPacket(loginFd, "Scene.ReqEnter", {
+        sceneId = 4
+    })
 end
 
 local function Tick()
     local resp, id, flag, tag = ReceiveMessage(loginFd)
     if not resp then
-        return Logger.Error("[C2S] recv failed")
+        return Logger.Error("[Receive] recv failed")
     end
 
-    Logger.Debug("Receive Server recv id:%s flag:%s tag:%s resp:%s", Pids[tonumber(id)], tostring(flag), tostring(tag), TableUtil.dump(resp))
+    Logger.Debug("[Receive] recv id:%s flag:%s tag:%s resp:%s", Pids[tonumber(id)], tostring(flag), tostring(tag), TableUtil.dump(resp))
 end
 
 local function Start(acc)

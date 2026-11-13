@@ -14,26 +14,71 @@ function SceneManager:Ctor()
 end
 
 function SceneManager:Init()
-    self.scenes[1] = Scene.new(ConfigRepository.Get("tbscenetable")[1])
+    self.scenes = {}
+    self.playerSceneMap = {}
 end
 
-function SceneManager:EnterScene(uid, sceneId)
-    local oldScene = self.playerSceneMap[uid]
-    
-    local newScene = self.scenes[sceneId]
+--- 按配置懒创建场景
+function SceneManager:GetScene(sceneId)
+    local scene = self.scenes[sceneId]
+    if scene then
+        return scene
+    end
+
+    local cfg = ConfigRepository.Get("tbscenetable")[sceneId]
+    if not cfg then
+        Logger.Error("[SceneManager]GetScene: config not found id:%s", tostring(sceneId))
+        return nil
+    end
+
+    scene = Scene.new(cfg)
+    self.scenes[sceneId] = scene
+    return scene
+end
+
+--- 进入/切换场景统一入口。
+--- oldScene 为 nil 就是首次进入；oldScene == newScene 就是原地不动。
+function SceneManager:ChangeScene(uid, newSceneId)
+    local newScene = self:GetScene(newSceneId)
     if not newScene then
-        Logger.Error("[SceneManager]EnterScene: Scene with id %s does not exist.", tostring(sceneId))
-        return
+        return nil, "scene not found"
     end
+
+    local oldScene = self.playerSceneMap[uid]
+    if oldScene == newScene then
+        return {
+            same = true,
+            oldUnit = nil,
+            oldOthers = {},
+            newUnit = newScene:GetUnit(uid),
+            newOthers = {},
+        }
+    end
+
+    local oldUnit, oldOthers
     if oldScene then
-        oldScene:Leave(uid)
+        oldUnit, oldOthers = oldScene:Leave(uid)
     end
+
     self:SetPlayerScene(uid, newScene)
-    return newScene:Enter(uid, nil, nil, nil)
+    local newUnit, newOthers = newScene:Enter(uid, nil, nil, nil)
+
+    return {
+        same = false,
+        oldUnit = oldUnit,
+        oldOthers = oldOthers or {},
+        newUnit = newUnit,
+        newOthers = newOthers or {},
+    }
 end
 
 function SceneManager:LeaveScene(uid)
-    return self:RemovePlayerScene(uid)
+    local scene = self.playerSceneMap[uid]
+    if not scene then
+        return nil, {}
+    end
+    self.playerSceneMap[uid] = nil
+    return scene:Leave(uid)
 end
 
 function SceneManager:Move(uid, moveContent)
@@ -43,10 +88,6 @@ function SceneManager:Move(uid, moveContent)
     else
         Logger.Error("[SceneManager]Move: Player with uid %s is not in any scene.", tostring(uid))
     end
-end
-
-function SceneManager:GetScene(sceneId)
-    return self.scenes[sceneId]
 end
 
 function SceneManager:GetPlayerScene(uid)

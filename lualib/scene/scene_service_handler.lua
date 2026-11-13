@@ -7,8 +7,8 @@ function CMD.start()
     return true
 end
 
-function CMD.enter(uid, sceneId)
-    return SceneManager.GetInstance():EnterScene(uid, sceneId)
+function CMD.change_scene(uid, sceneId)
+    return SceneManager.GetInstance():ChangeScene(uid, sceneId)
 end
 
 function CMD.leave(uid)
