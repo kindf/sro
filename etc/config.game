@@ -5,7 +5,6 @@ thread = 8
 -- 启动配置
 bootstrap = "snlua bootstrap"   -- The service for bootstrap
 start = "game_service"  -- main script
-nodename = "game"
 
 harbor = 0
 
@@ -13,3 +12,9 @@ luaservice = luaservice..root.."service/game/?.lua;"
 
 gateport = 9000
 maxclient = 1000
+
+-- debugger 配置
+logger = "vscdebuglog"
+logservice = "snlua"
+logpath = "."
+debugger = "skynet.vscdebug"

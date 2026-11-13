@@ -4,14 +4,16 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
+
         {
-            "name": "skynet debugger",
+            "name": "game debugger",
             "type": "lua",
             "request": "launch",
             "workdir": "${workspaceFolder}",
             "program": "./skynet/skynet",
-            "config": "./etc/config.cfg",
-            "service": "./service"
+            "config": "./etc/config.game",
+            "service": "./skynet/service"
         }
     ]
 }
