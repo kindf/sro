@@ -12,6 +12,8 @@ local account
 local loginFd
 local gatePort = skynet.getenv("gateport")
 
+local fd
+
 -- 服务端发包格式（HeadCodec.Encode 已经带上了 2B 长度）：
 --   [2B BE len][4B LE id][1B flag][4B LE tag?][body]
 -- socket.read 先读 2B 长度，再读 len 字节 payload，payload 交给 HeadCodec.Decode。
@@ -80,6 +82,16 @@ local function C2S(fd, protoName, data, callback)
     end
 end
 
+local function SendPacket(fd, protoName, data)
+    Logger.Debug("[C2S] send %s data:%s", protoName, TableUtil.dump(data))
+
+    local packet, err = PackMsg(protoName, data, 0)
+    if not packet then
+        return Logger.Error("[C2S] pack failed proto:%s err:%s", protoName, tostring(err))
+    end
+    socket.write(fd, packet)
+end
+
 local function DoSomething()
     loginFd = assert(socket.open("127.0.0.1", gatePort))
 
@@ -87,21 +99,45 @@ local function DoSomething()
     skynet.sleep(10)
 
     -- Scene.ReqMove 是 proto2 required，五个字段都要给
-    C2S(loginFd, "Scene.ReqMove", {
+    -- C2S(loginFd, "Scene.ReqMove", {
+    --     common = 90,
+    --     time = 0.1,
+    --     dx = 10,
+    --     dy = 0,
+    --     dz = 20,
+    -- }, function(resp)
+    --     Logger.Info("收到移动响应 %s", TableUtil.dump(resp))
+    -- end)
+
+    SendPacket(loginFd, "Scene.ReqMove", {
         common = 90,
         time = 0.1,
         dx = 10,
         dy = 0,
         dz = 20,
-    }, function(resp)
-        Logger.Info("收到移动响应 %s", TableUtil.dump(resp))
-    end)
+    })
+end
+
+local function Tick()
+    local resp, id, flag, tag = ReceiveMessage(loginFd)
+    if not resp then
+        return Logger.Error("[C2S] recv failed")
+    end
+
+    Logger.Debug("[C2S] recv id:%s flag:%s tag:%s resp:%s", Pids[tonumber(id)], tostring(flag), tostring(tag), TableUtil.dump(resp))
 end
 
 local function Start(acc)
     account = acc
     ProtocolHelper.RegisterProtocol()
     DoSomething()
+
+    skynet.fork(function()
+        while true do
+            Tick()
+            skynet.sleep(100)
+        end
+    end)
 end
 
 skynet.start(function()
