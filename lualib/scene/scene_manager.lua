@@ -28,11 +28,11 @@ function SceneManager:EnterScene(uid, sceneId, x, y, z)
         oldScene:Leave(uid)
     end
     self:SetPlayerScene(uid, newScene)
-    newScene:Enter(uid, x, y, z)
+    return newScene:Enter(uid, x, y, z)
 end
 
 function SceneManager:LeaveScene(uid)
-    self:RemovePlayerScene(uid)
+    return self:RemovePlayerScene(uid)
 end
 
 function SceneManager:Move(uid, moveContent)

@@ -8,12 +8,10 @@ function CMD.start()
 end
 
 function CMD.enter(uid, sceneId, x, y, z)
-    SceneManager.GetInstance():EnterScene(uid, sceneId, x, y, z)
-    return x, y, z
+    return SceneManager.GetInstance():EnterScene(uid, sceneId, x, y, z)
 end
 function CMD.leave(uid)
-    SceneManager.GetInstance():LeaveScene(uid)
-    return true
+    return SceneManager.GetInstance():LeaveScene(uid)
 end
 
 function CMD.move(uid, moveContent)

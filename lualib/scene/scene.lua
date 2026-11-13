@@ -25,12 +25,29 @@ function Scene:Enter(uid, x, y, z)
     unit.y = y
     unit.z = z
     unit.lastMoveAt = os.time()
-    unit.token = 2.0
+    unit.token = TOKEN_MAX
     self.units[uid] = unit
+
+    local others = {}
+    for id, u in pairs(self.units) do
+        if id ~= uid then
+            table.insert(others, {uid = id, x = u.x, y = u.y, z = u.z})
+        end
+    end
+
+    return unit:Pack(), others
 end
 
 function Scene:Leave(uid)
+    local unit = self.units[uid]
     self.units[uid] = nil
+
+    local others = {}
+    for id in pairs(self.units) do
+        table.insert(others, {uid = id})
+    end
+
+    return unit and unit:Pack(), others
 end
 
 local function _Finite(v)

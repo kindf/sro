@@ -5,4 +5,8 @@ return {
 [3067408801]="Scene.ReqMove",
 ["Scene.RespMove"]=585588273,
 [585588273]="Scene.RespMove",
+["Scene.UnitEnter"]=3616084026,
+[3616084026]="Scene.UnitEnter",
+["Scene.UnitLeave"]=4115222660,
+[4115222660]="Scene.UnitLeave",
 }

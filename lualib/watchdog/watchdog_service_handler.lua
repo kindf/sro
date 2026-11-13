@@ -34,15 +34,12 @@ function Socket.open(fd, addr)
     connections[fd] = connection
     Logger.Info("[WatchDog]open New client from:%s fd:%s",addr, tostring(fd))
     -- 先让 world 建好 player，并拿到 world 地址
-    local called, ok, world = pcall(skynet.call, ".world", "lua", "accept_client", fd, addr)
+    local called, world = skynet.call(".world", "lua", "player_socket_accept", fd, addr)
     if connections[fd] ~= connection then
         return
     end
-    if not called or not ok or not world then
+    if not called then
         closeClient(fd, "player_socket_close")
-        if not called then
-            world = ok
-        end
         return Logger.Error("[WatchDog]world accept_client failed fd:%s err:%s", tostring(fd), tostring(world))
     end
     -- 再把这条 fd 的后续数据转发给 world
@@ -54,7 +51,9 @@ function Socket.open(fd, addr)
             closeClient(fd, "player_socket_close")
         end
         Logger.Error("[WatchDog]gate forward failed fd:%s err:%s", tostring(fd), tostring(ferr))
+        return
     end
+    skynet.call(".world", "lua", "player_socket_ready", fd, addr)
 end
 
 -- 对端关闭后清理玩家，并释放 gate 中处于半关闭状态的 socket。

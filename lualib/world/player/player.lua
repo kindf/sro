@@ -17,7 +17,13 @@ function Player:Ctor()
 end
 
 function Player:OnBorn()
-    skynet.send(".scene", "lua", "enter", self.uid, 1, 0, 0, 0)
+    local ok, unit, others = skynet.call(".scene", "lua", "enter", self.uid, 1, 0, 0, 0)
+    if not ok then
+        Logger.Error("[Player]OnBorn failed, enter scene failed. uid:%s, reason:%s", self.uid, unit)
+        return
+    end
+
+    return unit, others
 end
 
 function Player:SendPackage(package)
@@ -51,7 +57,7 @@ function Player:ReqMove(req)
         Logger.Warning("[Player]ReqMove failed, move operation failed. uid:%s, reason:%s", self.uid, moveContent)
         return
     end
-    resp.dx, resp.dy, resp.dz, resp.time, resp.forced, resp.common = moveContent.dx, moveContent.dy, moveContent.dz, moveContent.time, moveContent.forced, common
+    resp.dx, resp.dy, resp.dz, resp.time, resp.forced, resp.common, resp.uid = moveContent.dx, moveContent.dy, moveContent.dz, moveContent.time, moveContent.forced, common, self.uid
     
     local packet = ProtocolHelper.EncodePTCPacket("Scene.RespMove", resp)
     return packet, resp.forced

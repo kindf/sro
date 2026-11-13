@@ -16,32 +16,64 @@ function CMD.start()
     return true
 end
 
-function CMD.accept_client(fd, addr)
+function CMD.player_socket_accept(fd, addr)
     Logger.Info("[World]accept New client from:%s fd:%s",addr, tostring(fd))
-    local player = PlayerManager.GetInstance():GetPlayerByFd(fd)
-    if not player then
-        player = PlayerLoader.LoadPlayer(fd, addr)
-        PlayerManager.GetInstance():AddPlayer(player.uid, player)
-        player:OnBorn()
-    end
     return skynet.self()
 end
 
-function CMD.player_socket_close(fd)
+function CMD.player_socket_ready(fd, addr)
+    Logger.Info("[World]socket ready from:%s fd:%s",addr, tostring(fd))
     local player = PlayerManager.GetInstance():GetPlayerByFd(fd)
     if player then
-        skynet.send(".scene", "lua", "leave", player.uid)
+        Logger.Error("[World]accept New client from:%s fd:%s",addr, tostring(fd))
+        return
     end
+    player = PlayerLoader.LoadPlayer(fd, addr)
+    PlayerManager.GetInstance():AddPlayer(player.uid, player)
+    local unit, others = player:OnBorn()
+    
+    -- 通知该玩家其他玩家位置
+    for _, u in pairs(others) do
+        local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitEnter", u)
+        player:SendPackage(packet)
+    end
+
+    -- 通知其他玩家该玩家位置
+    local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitEnter", unit)
+    PlayerManager.GetInstance():Broadcast(packet, { [unit.uid] = true })
+end
+
+local function LeaveScene(fd, callback)
+    local player = PlayerManager:GetInstance():GetPlayerByFd(fd)
+    if player then
+        local ok, unit, others = skynet.call(".scene", "lua", "leave", player.uid)
+        if ok then
+            local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitLeave", {
+                uid = player.uid,
+            })
+            for _, u in ipairs(others or {}) do
+                PlayerManager:GetInstance():SendUidPacket(u.uid, packet)
+            end
+        end
+    end
+    if callback then
+        callback()
+    end
+end
+
+function CMD.player_socket_close(fd)
     PlayerManager.GetInstance():PlayerSocketClose(fd)
+    LeaveScene(fd, function()
+        PlayerManager.GetInstance():PlayerSocketClose(fd)
+    end)
     Logger.Info("[World]Socket close fd:%s", tostring(fd))
 end
 
 function CMD.player_socket_error(fd)
-    local player = PlayerManager.GetInstance():GetPlayerByFd(fd)
-    if player then
-        skynet.send(".scene", "lua", "leave", player.uid)
-    end
     PlayerManager.GetInstance():PlayerSocketError(fd)
+    LeaveScene(fd, function()
+        PlayerManager.GetInstance():PlayerSocketError(fd)
+    end)
     Logger.Info( "[World]Socket error fd:%s", tostring(fd))
 end
 -- 分发

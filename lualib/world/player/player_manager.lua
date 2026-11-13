@@ -67,6 +67,19 @@ function PlayerManager:Broadcast(packet, exceptUids)
     end
 end
 
+function PlayerManager:SendUidsPacket(uids, packet)
+    for _, uid in pairs(uids) do
+        self:SendUidPacket(uid)
+    end
+end
+
+function PlayerManager:SendUidPacket(uid, packet)
+    local player = self.playersUidMap[uid]
+    if player then
+        player:SendPackage(packet)
+    end
+end
+
 ---@type PlayerManager
 local GPlayerManager
 function PlayerManager.GetInstance()

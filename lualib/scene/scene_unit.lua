@@ -22,4 +22,14 @@ function SceneUnit:Ctor()
     self.token = 0
 end
 
+function SceneUnit:Pack()
+    return {
+        uid = self.uid,
+        x = self.x,
+        y = self.y,
+        z = self.z,
+        face = self.face,
+    }
+end
+
 return SceneUnit

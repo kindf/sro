@@ -18,3 +18,15 @@ message RespMove {
     optional bool forced = 6;   // true: server forced back
     optional uint64 uid = 7;    // 移动的玩家 uid，广播时用于区分是谁
 }
+
+message UnitEnter {
+    required uint64 uid = 1;
+    required float x = 2;
+    required float y = 3;
+    required float z = 4;
+    optional int32 common = 5;
+}
+
+message UnitLeave {
+    required uint64 uid = 1;
+}
