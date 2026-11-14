@@ -25,10 +25,30 @@ message UnitEnter {
     required float y = 3;
     required float z = 4;
     optional int32 common = 5;
+    optional int32 hp = 6;
+    optional int32 maxHp = 7;
 }
 
 message UnitLeave {
     required uint64 uid = 1;
+}
+
+message ReqCastSkill {
+    required uint32 skillId = 1;
+    required uint64 targetUid = 2;
+}
+
+message RespCastSkill {
+    required int32 code = 1;        // 0 成功，非 0 失败
+    required uint64 targetUid = 2;
+    required int32 damage = 3;
+    required int32 targetHp = 4;
+}
+
+message UnitHp {
+    required uint64 uid = 1;
+    required int32 hp = 2;
+    required int32 maxHp = 3;
 }
 
 message ReqEnter {

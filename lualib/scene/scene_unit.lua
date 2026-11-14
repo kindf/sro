@@ -11,6 +11,9 @@ local Class = require "common.class"
 ---@field token number
 ---@field gx number
 ---@field gz number
+---@field hp number
+---@field maxHp number
+---@field skillCooldown table<number, number>
 local SceneUnit = Class("SceneUnit")
 
 function SceneUnit:Ctor()
@@ -24,6 +27,9 @@ function SceneUnit:Ctor()
     self.token = 0
     self.gx = 0
     self.gz = 0
+    self.hp = 1000
+    self.maxHp = 1000
+    self.skillCooldown = {}
 end
 
 function SceneUnit:Pack()
@@ -33,6 +39,8 @@ function SceneUnit:Pack()
         y = self.y,
         z = self.z,
         common = (self.face or 0) | (self.moving and (1 << 30) or 0),
+        hp = self.hp,
+        maxHp = self.maxHp
     }
 end
 

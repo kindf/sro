@@ -1,5 +1,5 @@
 
-…
+­
 scene.protoScene"e
 ReqMove
 common (Rcommon
@@ -14,15 +14,29 @@
 dy (Rdy
 dz (Rdz
 forced (Rforced
-uid (Ruid"_
+uid (Ruid"…
 	UnitEnter
 uid (Ruid
 x (Rx
 y (Ry
 z (Rz
-common (Rcommon"
+common (Rcommon
+hp (Rhp
+maxHp (RmaxHp"
 	UnitLeave
-uid (Ruid"$
+uid (Ruid"F
+ReqCastSkill
+skillId (RskillId
+	targetUid (R	targetUid"u
+RespCastSkill
+code (Rcode
+	targetUid (R	targetUid
+damage (Rdamage
+targetHp (RtargetHp"@
+UnitHp
+uid (Ruid
+hp (Rhp
+maxHp (RmaxHp"$
 ReqEnter
 sceneId (RsceneId"O
 	RespEnter

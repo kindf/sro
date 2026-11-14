@@ -1,4 +1,5 @@
 local SceneManager = require "scene.scene_manager"
+local skynet = require "skynet"
 local Handler = {}
 local CMD = {}
 
@@ -25,6 +26,10 @@ function CMD.get_unit(uid)
         return scene:GetUnit(uid)
     end
     return nil
+end
+
+function CMD.cast_skill(uid, req)
+    return SceneManager.GetInstance():CastSkill(uid, req, skynet.now() / 100)
 end
 
 Handler.CMD = CMD

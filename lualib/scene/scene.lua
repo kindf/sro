@@ -14,6 +14,17 @@ local DEFAULT_MIN_X = -10000-- 默认地图尺寸
 local DEFAULT_MAX_Z = 10000-- 默认地图尺寸
 local DEFAULT_MIN_Z = -10000-- 默认地图尺寸
 
+local SKILL_RANGE       = 10.0
+local SKILL_COOLDOWN    = 0.5
+local SKILL_DAMAGE      = 100
+local SKILL_OK          = 0
+local SKILL_NO_TARGET   = 1
+local SKILL_SELF        = 2
+local SKILL_OUT_RANGE   = 3
+local SKILL_COOLDOWNING = 4
+local SKILL_TARGET_DEAD = 5
+local SKILL_NOT_SELF    = 6
+
 
 ---@class Scene
 ---@field sceneId number
@@ -219,6 +230,71 @@ end
 
 function Scene:GetUnit(uid)
     return self.units[uid]
+end
+
+function Scene:CastSkill(uid, req, now)
+    local target = req.targetUid
+    local skillId = req.skillId
+    local failedResult = {
+        targetUid = target,
+        damage = 0,
+        targetHp = 0,
+        maxHp = 0,
+        receivers = {},
+    }
+
+    local target = self.units[target]
+    if not target then
+        failedResult.code = SKILL_NO_TARGET
+        return failedResult
+    end
+
+    if target.uid == uid then
+        failedResult.code = SKILL_SELF
+        return failedResult
+    end
+
+    local unit = self.units[uid]
+    if not unit then
+        failedResult.code = SKILL_NOT_SELF
+        return failedResult
+    end
+
+    local dist = math.sqrt((target.x - unit.x)^2 + (target.z - unit.z)^2)
+    if dist > SKILL_RANGE then
+        failedResult.code = SKILL_OUT_RANGE
+        return failedResult
+    end
+
+    local last = unit.skillCooldown[skillId] or 0
+    if now - last < SKILL_COOLDOWN then
+        failedResult.code = SKILL_COOLDOWNING
+        return failedResult
+    end
+
+    if target.hp <= 0 then
+        failedResult.code = SKILL_TARGET_DEAD
+        return failedResult
+    end
+
+    unit.skillCooldown[skillId] = now
+    target.hp = math.max(0, target.hp - SKILL_DAMAGE)
+    
+    local set = self:GetNeighborSet(target.gx, target.gz)
+    set[uid] = nil
+    local receives = {}
+    for id in pairs(set) do
+        table.insert(receives, id)
+    end
+
+    return {
+        code = 0,
+        targetUid = target.uid,
+        damage = SKILL_DAMAGE,
+        targetHp = target.hp,
+        maxHp = target.maxHp,
+        receivers = receives,
+    }
 end
 
 return Scene

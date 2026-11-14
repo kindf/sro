@@ -106,6 +106,15 @@ function SceneManager:RemovePlayerScene(uid)
     self.playerSceneMap[uid] = nil
 end
 
+function SceneManager:CastSkill(uid, req, now)
+    local scene = self.playerSceneMap[uid]
+    if not scene then
+        Logger.Error("[SceneManager]CastSkill: Player with uid %s is not in any scene.", tostring(uid))
+        return nil, "not in scene"
+    end
+    return scene:CastSkill(uid, req, now)
+end
+
 ---@type SceneManager
 local GSceneManager = nil
 function SceneManager.GetInstance()

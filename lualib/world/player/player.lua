@@ -70,4 +70,15 @@ function Player:ReqMove(req)
     return packet, moveContent
 end
 
+function Player:CastSkill(req)
+    local ok, result = skynet.call(".scene", "lua", "cast_skill", self.uid, {
+        skillId = req.skillId,
+        targetUid = req.targetUid,
+    })
+    if not ok or not result then
+        return nil
+    end
+    return result
+end
+
 return Player

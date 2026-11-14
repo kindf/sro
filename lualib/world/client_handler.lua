@@ -90,3 +90,29 @@ local function ReqEnter(player, req)
     ApplySceneChange(player, data, req.sceneId, true)
 end
 ProtocolHelper.RegisterPTCHandler("Scene.ReqEnter", ReqEnter)
+
+local function ReqCaskSkill(player, req)
+    local data = player:CastSkill(req)
+    if not data then
+        return
+    end
+
+    -- 先回自己
+    player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.RespCastSkill", {
+        code = data.code,
+        targetUid = data.targetUid,
+        damage = data.damage,
+        targetHp = data.targetHp,
+    }))
+
+    -- 再回目标
+    if data.code == 0 then
+        local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitHp", {
+            uid = req.targetUid,
+            hp = data.targetHp,
+            maxHp = data.maxHp,
+        })
+        PlayerManager:GetInstance():SendUidsPacket(data.receivers, packet)
+    end
+end
+ProtocolHelper.RegisterPTCHandler("Scene.ReqCastSkill", ReqCaskSkill)
