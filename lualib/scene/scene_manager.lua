@@ -115,6 +115,22 @@ function SceneManager:CastSkill(uid, req, now)
     return scene:CastSkill(uid, req, now)
 end
 
+function SceneManager:Revice(uid)
+    local scene = self.playerSceneMap[uid]
+    if not scene then
+        Logger.Error("[SceneManager]Revice: Player with uid %s is not in any scene.", tostring(uid))
+        return nil, "not in scene"
+    end
+    local oldUnit, oldOthers = scene:Leave(uid)
+    local newUnit, newOthers = scene:Enter(uid, nil, nil, nil)
+    return {
+        oldUnit = oldUnit,
+        oldOthers = oldOthers or {},
+        newUnit = newUnit,
+        newOthers = newOthers or {},
+    }
+end
+
 ---@type SceneManager
 local GSceneManager = nil
 function SceneManager.GetInstance()

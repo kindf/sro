@@ -28,8 +28,14 @@ function CMD.get_unit(uid)
     return nil
 end
 
+-- 使用技能
 function CMD.cast_skill(uid, req)
     return SceneManager.GetInstance():CastSkill(uid, req, skynet.now() / 100)
+end
+
+-- 复活
+function CMD.revive(uid)
+    return SceneManager.GetInstance():Revice(uid)
 end
 
 Handler.CMD = CMD

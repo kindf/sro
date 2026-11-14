@@ -24,6 +24,7 @@ local SKILL_OUT_RANGE   = 3
 local SKILL_COOLDOWNING = 4
 local SKILL_TARGET_DEAD = 5
 local SKILL_NOT_SELF    = 6
+local SKILL_CASTER_DEAD = 7
 
 
 ---@class Scene
@@ -108,6 +109,7 @@ function Scene:Enter(uid, x, y, z)
     unit.face = self.startFace or 0
     unit.lastMoveAt = os.time()
     unit.token = TOKEN_MAX
+    unit.dead = false
     self.units[uid] = unit
 
     self:AddToGrid(unit)
@@ -161,6 +163,11 @@ function Scene:Move(uid, moveContent)
         Logger.Warning("[Scene]Move: uid:%s not found in scene", tostring(uid))
         return
     end
+
+    if unit.dead then
+        return _ForcedBack(unit)
+    end
+    
     local dx, dy, dz, time = moveContent.dx, moveContent.dy, moveContent.dz, moveContent.time
     if not _Finite(dx) or not _Finite(dy) or not _Finite(dz) or not _Finite(time) then
         return _ForcedBack(unit)
@@ -260,6 +267,11 @@ function Scene:CastSkill(uid, req, now)
         return failedResult
     end
 
+    if unit.dead then
+        failedResult.code = SKILL_CASTER_DEAD
+        return failedResult
+    end
+
     local dist = math.sqrt((target.x - unit.x)^2 + (target.z - unit.z)^2)
     if dist > SKILL_RANGE then
         failedResult.code = SKILL_OUT_RANGE
@@ -279,6 +291,11 @@ function Scene:CastSkill(uid, req, now)
 
     unit.skillCooldown[skillId] = now
     target.hp = math.max(0, target.hp - SKILL_DAMAGE)
+    local dead = false
+    if target.hp <= 0 and target.dead == false then
+        target.dead = true
+        dead = true
+    end
     
     local set = self:GetNeighborSet(target.gx, target.gz)
     set[uid] = nil
@@ -294,6 +311,8 @@ function Scene:CastSkill(uid, req, now)
         targetHp = target.hp,
         maxHp = target.maxHp,
         receivers = receives,
+        dead = dead,
+        deadReceivers = dead and receives or {},
     }
 end
 

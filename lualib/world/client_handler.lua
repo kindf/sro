@@ -116,3 +116,22 @@ local function ReqCaskSkill(player, req)
     end
 end
 ProtocolHelper.RegisterPTCHandler("Scene.ReqCastSkill", ReqCaskSkill)
+
+local function ReqRevive(player, req)
+    local result = player:Revive()
+    if not result then
+        return
+    end
+
+    ApplySceneChange(player, result, player.sceneId, false)
+
+    player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.RespRevive", {
+        uid = player.uid,
+        x = result.newUnit.x,
+        y = result.newUnit.y,
+        z = result.newUnit.z,
+        hp = result.newUnit.hp,
+        maxHp = result.newUnit.maxHp,
+    }))
+end
+ProtocolHelper.RegisterPTCHandler("Scene.ReqRevive", ReqRevive)

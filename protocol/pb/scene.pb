@@ -1,5 +1,5 @@
 
-­
+È
 scene.protoScene"e
 ReqMove
 common (Rcommon
@@ -36,7 +36,18 @@
 UnitHp
 uid (Ruid
 hp (Rhp
-maxHp (RmaxHp"$
+maxHp (RmaxHp"
+UnitDead
+uid (Ruid"
+	ReqRevive"n
+
+RespRevive
+uid (Ruid
+x (Rx
+y (Ry
+z (Rz
+hp (Rhp
+maxHp (RmaxHp"$
 ReqEnter
 sceneId (RsceneId"O
 	RespEnter

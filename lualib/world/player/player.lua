@@ -81,4 +81,12 @@ function Player:CastSkill(req)
     return result
 end
 
+function Player:Revive()
+    local ok, result = skynet.call(".scene", "lua", "revive", self.uid)
+    if not ok or not result then
+        return nil
+    end
+    return result
+end
+
 return Player

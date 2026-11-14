@@ -29,6 +29,7 @@ function SceneUnit:Ctor()
     self.gz = 0
     self.hp = 1000
     self.maxHp = 1000
+    self.dead = false
     self.skillCooldown = {}
 end
 
