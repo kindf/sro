@@ -1,5 +1,6 @@
 
-€
+½
+
 scene.protoScene"e
 ReqMove
 common (Rcommon
@@ -14,7 +15,7 @@
 dy (Rdy
 dz (Rdz
 forced (Rforced
-uid (Ruid"½
+uid (Ruid"Ó
 	UnitEnter
 uid (Ruid
 x (Rx
@@ -24,7 +25,9 @@
 hp (Rhp
 maxHp (RmaxHp
 entityId (RentityId
-unitType	 (RunitType"
+unitType	 (RunitType
+count
+ (Rcount"
 	UnitLeave
 uid (Ruid"F
 ReqCastSkill
@@ -49,7 +52,21 @@ RespRevive
 y (Ry
 z (Rz
 hp (Rhp
-maxHp (RmaxHp"$
+maxHp (RmaxHp"©
+RespExp
+uid (Ruid
+baseExp (RbaseExp
+jobExp (RjobExp"
+totalBaseExp (RtotalBaseExp 
+totalJobExp (RtotalJobExp
+level (Rlevel")
+	ReqPickup
+	targetUid (R	targetUid"N
+
+RespPickup
+code (Rcode
+itemId (RitemId
+count (Rcount"$
 ReqEnter
 sceneId (RsceneId"O
 	RespEnter

@@ -44,6 +44,10 @@ function CMD.revive(uid)
     return SceneManager.GetInstance():Revice(uid)
 end
 
+function CMD.pickup(uid, targetUid)
+    return SceneManager.GetInstance():Pickup(uid, targetUid)
+end
+
 Handler.CMD = CMD
 
 return Handler

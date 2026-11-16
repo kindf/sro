@@ -89,4 +89,12 @@ function Player:Revive()
     return result
 end
 
+function Player:Pickup(targetUid)
+    local ok, data = skynet.call(".scene", "lua", "pickup", self.uid, targetUid)
+    if not ok or not data then
+        return nil
+    end
+    return data
+end
+
 return Player

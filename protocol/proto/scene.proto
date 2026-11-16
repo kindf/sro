@@ -28,7 +28,8 @@ message UnitEnter {
     optional int32 hp = 6;
     optional int32 maxHp = 7;
     optional uint32 entityId = 8;   // 怪物/角色模板 id，玩家为 0
-    optional uint32 unitType = 9;   // 0 玩家，1 怪物
+    optional uint32 unitType = 9;   // 0 玩家，1 怪物，2 掉落
+    optional int32 count = 10;      // 掉落数量
 }
 
 message UnitLeave {
@@ -67,6 +68,25 @@ message RespRevive {
     required float z = 4;
     required int32 hp = 5;
     required int32 maxHp = 6;
+}
+
+message RespExp {
+    required uint64 uid = 1;
+    required int32 baseExp = 2;       // 本次获得
+    required int32 jobExp = 3;
+    required int32 totalBaseExp = 4;  // 累计
+    required int32 totalJobExp = 5;
+    required int32 level = 6;
+}
+
+message ReqPickup {
+    required uint64 targetUid = 1;
+}
+
+message RespPickup {
+    required int32 code = 1;    // 0 成功
+    required uint32 itemId = 2;
+    required int32 count = 3;
 }
 
 message ReqEnter {

@@ -3,6 +3,7 @@ local SceneUnit = require "scene.scene_unit"
 local Logger = require "common.logger"
 local MonsterUnit = require "lualib.scene.monster_unit"
 local ConfigRepository = require "common.config_repository"
+local DropUnit = require("lualib.scene.drop_unit")
 
 local MAX_SPEED       = 6.0   -- 占位，后面从属性表取
 local SPEED_TOLERANCE = 2.0   -- 允许 2 倍速度
@@ -17,6 +18,7 @@ local DEFAULT_MAX_Z = 10000-- 默认地图尺寸
 local DEFAULT_MIN_Z = -10000-- 默认地图尺寸
 
 local MONSTER_UID_BASE = 1000000 -- 怪物uid偏移
+local DROP_UID_BASE = 2000000 -- 掉落物id偏移
 
 local SKILL_RANGE       = 10.0
 local SKILL_COOLDOWN    = 0.5
@@ -41,6 +43,7 @@ local SKILL_CASTER_DEAD = 7
 ---@field minZ number
 ---@field spawns table
 ---@field monsterSeq number
+---@field dropSeq number
 local Scene = Class("Scene")
 
 function Scene:Ctor(cfg)
@@ -64,6 +67,7 @@ function Scene:Ctor(cfg)
 
     self.spawns = {}
     self.monsterSeq = 0
+    self.dropSeq = 0
 end
 
 function Scene:GridKey(gx, gz)
@@ -307,13 +311,20 @@ function Scene:CastSkill(uid, req, now)
 
     -- 仇恨
     if target:IsMonster() then
+        target.lastAttacker = uid
         target:AddHatred(uid, SKILL_DAMAGE, now)
     end
     
     local dead = false
     if target.hp <= 0 and target.dead == false then
         target.dead = true
+        target.killerUid = unit.uid
         dead = true
+    end
+
+    local reward
+    if dead and target:IsMonster() and unit:IsPlayer() then
+        reward = self:GiveReward(unit, target)
     end
     
     local set = self:GetNeighborSet(target.gx, target.gz)
@@ -332,6 +343,48 @@ function Scene:CastSkill(uid, req, now)
         receivers = receives,
         dead = dead,
         deadReceivers = dead and receives or {},
+        reward = reward,
+    }
+end
+
+function Scene:GiveReward(player, monster)
+    local cfg = ConfigRepository.Get("tbentityable")[monster.entityId]
+    if not cfg then
+        return nil
+    end
+
+    local baseExp = cfg.BaseExp or 0
+    local jobExp = cfg.JobExp or 0
+
+    player.baseExp = player.baseExp + baseExp
+    player.jobExp = player.jobExp + jobExp
+
+    local drops = {}
+    for _, itemId in ipairs(cfg.Award or {}) do
+        local drop = self:DropItem(itemId, 1, monster.x, monster.z)
+        table.insert(drops, drop:Pack())
+    end
+
+    for _, d in ipairs(cfg.DropDoodad or {}) do
+        local itemId, count = d[1], d[2] or 1
+        local drop = self:DropItem(itemId, count, monster.x, monster.z)
+        table.insert(drops, drop:Pack())
+    end
+
+    local set = self:GetNeighborSet(monster.gx, monster.gz)
+    local receivers = {}
+    for id in pairs(set) do
+        table.insert(receivers, id)
+    end
+    
+    return {
+        baseExp = baseExp,
+        jobExp = jobExp,
+        totalBaseExp = player.baseExp,
+        totalJobExp = player.jobExp,
+        level = player.level,
+        drops = drops,
+        dropReceivers = receivers,
     }
 end
 
@@ -469,6 +522,46 @@ function Scene:UpdateSpawns(now, events)
             end
         end
     end
+end
+
+function Scene:DropItem(itemId, count, x, z)
+    self.dropSeq = self.dropSeq + 1
+    local unit = DropUnit.new(itemId, count, x, z)
+    unit.uid = DROP_UID_BASE + self.dropSeq
+    self:AddUnit(unit)
+    return unit
+end
+
+function Scene:Pickup(uid, targetUid)
+    local player = self.units[uid]
+    local drop = self.units[targetUid]
+
+    if not player or not drop or not drop:IsDrop() then
+        return {code = 1} -- 不存在
+    end
+
+    local dist = math.sqrt((player.x - drop.x)^2 + (player.z - drop.z)^2)
+    if dist > 2.0 then
+        return {code = 2} -- 太远
+    end
+
+    local set = self:GetNeighborSet(drop.gx, drop.gz)
+    local receivers = {}
+    for id in pairs(set) do
+        if id ~= drop.uid then
+            table.insert(receivers, id)
+        end
+    end
+
+    local itemId, count = drop.itemId, drop.count
+    self:RemoveUnit(drop)
+
+    return {
+        code = 0,
+        itemId = itemId,
+        count = count,
+        receivers = receivers,
+    }
 end
 
 return Scene

@@ -144,6 +144,15 @@ function SceneManager:UpdateAI(now)
     end
 end
 
+function SceneManager:Pickup(uid, targetUid)
+    local scene = self.playerSceneMap[uid]
+    if not scene then
+        return nil
+    end
+
+    return scene:Pickup(uid, targetUid)
+end
+
 ---@type SceneManager
 local GSceneManager = nil
 function SceneManager.GetInstance()

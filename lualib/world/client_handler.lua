@@ -50,6 +50,7 @@ local function ReqEnter(player, req)
 end
 ProtocolHelper.RegisterPTCHandler("Scene.ReqEnter", ReqEnter)
 
+---@param player Player
 local function ReqCaskSkill(player, req)
     local data = player:CastSkill(req)
     if not data then
@@ -73,9 +74,28 @@ local function ReqCaskSkill(player, req)
         })
         PlayerManager:GetInstance():SendUidsPacket(data.receivers, packet)
     end
+
+    if data.reward then
+        if data.reward.baseExp > 0 or data.reward.jobExp > 0 then
+            player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.RespExp", {
+                uid = player.uid,
+                baseExp = data.reward.baseExp,
+                jobExp = data.reward.jobExp,
+                totalBaseExp = data.reward.totalBaseExp ,
+                totalJobExp = data.reward.totaljobExp,
+                level = data.reward.level,
+            }))
+        end
+
+        for _, drop in ipairs(data.reward.drops or {}) do
+            local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitEnter", drop)
+            PlayerManager:GetInstance():SendUidsPacket(data.reward.dropReceivers, packet)
+        end
+    end
 end
 ProtocolHelper.RegisterPTCHandler("Scene.ReqCastSkill", ReqCaskSkill)
 
+---@param player Player
 local function ReqRevive(player, req)
     local result = player:Revive()
     if not result then
@@ -94,3 +114,25 @@ local function ReqRevive(player, req)
     }))
 end
 ProtocolHelper.RegisterPTCHandler("Scene.ReqRevive", ReqRevive)
+
+---@param player Player
+local function ReqPickup(player, req)
+    local data = player:Pickup(req.targetUid)
+    if not data then
+        return
+    end
+
+    player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.RespPickup", {
+        code = data.code,
+        itemId = data.itemId or 0,
+        count = data.count or 0,
+    }))
+
+    if data.code == 0 then
+        local leave = ProtocolHelper.EncodePTCPacket("Scene.UnitLeave", {
+            uid = req.targetUid,
+        })
+        PlayerManager.GetInstance():SendUidsPacket(data.receivers, leave)
+    end
+end
+ProtocolHelper.RegisterPTCHandler("Scene.ReqPickup", ReqPickup)

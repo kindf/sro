@@ -15,6 +15,9 @@ local Logger = require "common.logger"
 ---@field hp number
 ---@field maxHp number
 ---@field skillCooldown table<number, number>
+---@field baseExp number
+---@field jobExp number
+---@field level number
 local SceneUnit = Class("SceneUnit")
 
 function SceneUnit:Ctor()
@@ -32,6 +35,9 @@ function SceneUnit:Ctor()
     self.maxHp = 1000
     self.dead = false
     self.skillCooldown = {}
+    self.baseExp = 0
+    self.jobExp = 0
+    self.level = 1
 end
 
 function SceneUnit:UpdateAI(scene, now, events)
