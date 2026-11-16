@@ -35,6 +35,12 @@ local SKILL_CASTER_DEAD = 7
 ---@field sceneId number
 ---@field units table<integer, SceneUnit>
 ---@field grids table<integer, table<integer, boolean>>
+---@field startPost table
+---@field startFace number
+---@field minX number
+---@field minZ number
+---@field spawns table
+---@field monsterSeq number
 local Scene = Class("Scene")
 
 function Scene:Ctor(cfg)
@@ -55,6 +61,9 @@ function Scene:Ctor(cfg)
         self.minX, self.maxX = -DEFAULT_MIN_X, DEFAULT_MAX_X
         self.minZ, self.maxZ = DEFAULT_MIN_Z, DEFAULT_MAX_Z
     end
+
+    self.spawns = {}
+    self.monsterSeq = 0
 end
 
 function Scene:GridKey(gx, gz)
@@ -338,8 +347,9 @@ function Scene:AddMonster(entityId, x, z)
         return nil
     end
 
+    self.monsterSeq = self.monsterSeq + 1
     local unit = MonsterUnit.new(entityId, x, z)
-    unit.uid = MONSTER_UID_BASE + entityId
+    unit.uid = MONSTER_UID_BASE + self.monsterSeq
     unit.hp = cfg.BaseHP
     unit.maxHp = cfg.BaseHP
     unit.speed = cfg.MoveSpeed
@@ -350,8 +360,39 @@ function Scene:AddMonster(entityId, x, z)
     return unit
 end
 
-function Scene:UpdateAI(now)
+function Scene:InitSpawns(defs)
+    for i, def in ipairs(defs) do
+        self.spawns[i] = {
+            def = def,
+            uid = nil,
+            respawnAt = nil,
+        }
+        self:SpawnPoint(i)
+    end
+end
+
+function Scene:SpawnPoint(index)
+    local sp = self.spawns[index]
+    if not sp then
+        return nil
+    end
+
+    local unit = self:AddMonster(sp.def.entityId, sp.def.x, sp.def.z)
+    if unit then
+        sp.uid = unit.uid
+        sp.respawnAt = nil
+    end
+    return unit
+end
+
+function Scene:Update(now)
     local events = {}
+    self:UpdateAI(now, events)
+    self:UpdateSpawns(now, events)
+    return events
+end
+
+function Scene:UpdateAI(now, events)
     for _, unit in pairs(self.units) do
         if not unit.dead then
             unit:UpdateAI(self, now, events)
@@ -374,6 +415,60 @@ function Scene:FindNearestPlayer(monster)
     end
 
     return best
+end
+
+function Scene:RemoveUnit(unit)
+    if not unit then
+        return
+    end
+    self:RemoveFromGrid(unit)
+    self.units[unit.uid] = nil
+end
+
+function Scene:UpdateSpawns(now, events)
+    for index, sp in ipairs(self.spawns) do
+        local unit = self.units[sp.uid]
+
+        if unit and unit.dead then
+            if not sp.respawnAt then
+                sp.respawnAt = now + sp.def.respawn
+            end
+
+            if now >= sp.respawnAt then
+                local set = self:GetNeighborSet(unit.gx, unit.gz)
+                local receivers = {}
+                for uid in pairs(set) do
+                    if uid ~= unit.uid then
+                        table.insert(receivers, uid)
+                    end
+                end
+                local oldUid = unit.uid
+                self:RemoveUnit(unit)
+                table.insert(events, {
+                    kind = "leave",
+                    uid = oldUid,
+                    receivers = receivers,
+                })
+
+                local newUnit = self:SpawnPoint(index)
+                if newUnit then
+                    local newSet = self:GetNeighborSet(newUnit.gx, newUnit.gz)
+                    local enterReceivers = {}
+                    for uid in pairs(newSet) do
+                        if uid ~= newUnit.uid then
+                            table.insert(enterReceivers, uid)
+                        end
+                    end
+
+                    table.insert(events, {
+                        kind = "enter",
+                        unit = newUnit:Pack(),
+                        receivers = enterReceivers,
+                    })
+                end
+            end
+        end
+    end
 end
 
 return Scene

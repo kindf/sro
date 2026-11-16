@@ -3,6 +3,7 @@ local Scene = require "scene.scene"
 local Logger = require "common.logger"
 local ConfigRepository = require "common.config_repository"
 local skynet = require "skynet"
+local SceneSpawn = require "lualib.scene.scene_spawn"
 
 ---@class SceneManager
 ---@field scenes table<integer, Scene>
@@ -35,11 +36,7 @@ function SceneManager:GetScene(sceneId)
 
     scene = Scene.new(cfg)
     self.scenes[sceneId] = scene
-    if sceneId == 1 then
-        scene:AddMonster(8252, 158, 130)
-        scene:AddMonster(8253, 150, 136)
-        scene:AddMonster(8254, 148, 124)
-    end
+    scene:InitSpawns(SceneSpawn[sceneId] or {})
     return scene
 end
 
@@ -140,7 +137,7 @@ end
 
 function SceneManager:UpdateAI(now)
     for _, scene in pairs(self.scenes) do
-        local events = scene:UpdateAI(now)
+        local events = scene:Update(now)
         if #events > 0 then
             skynet.send(".world", "lua", "scene_events", events)
         end

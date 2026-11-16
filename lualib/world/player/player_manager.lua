@@ -157,6 +157,12 @@ function PlayerManager:OnSceneEvent(events)
                 uid = e.uid,
             })
             self:SendUidsPacket(e.receivers, packet)
+        elseif e.kinf == "leave" then
+            local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitLeave", {uid = e.uid})
+            self:SendUidsPacket(e.receivers, packet)
+        elseif e.kind == "enter" then
+            local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitEnter", e.unit)
+            self:SendUidsPacket(e.receivers, packet)
         end
     end
 end
