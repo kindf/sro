@@ -5,6 +5,12 @@ local CMD = {}
 
 function CMD.start()
     SceneManager.GetInstance():Init()
+    skynet.fork(function()
+        while true do
+            skynet.sleep(30)
+            SceneManager.GetInstance():UpdateAI(skynet.now() / 100)
+        end
+    end)
     return true
 end
 

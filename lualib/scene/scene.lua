@@ -1,6 +1,8 @@
 local Class = require "common.class"
 local SceneUnit = require "scene.scene_unit"
 local Logger = require "common.logger"
+local MonsterUnit = require "lualib.scene.monster_unit"
+local ConfigRepository = require "common.config_repository"
 
 local MAX_SPEED       = 6.0   -- 占位，后面从属性表取
 local SPEED_TOLERANCE = 2.0   -- 允许 2 倍速度
@@ -13,6 +15,8 @@ local DEFAULT_MAX_X = 10000 -- 默认地图尺寸
 local DEFAULT_MIN_X = -10000-- 默认地图尺寸
 local DEFAULT_MAX_Z = 10000-- 默认地图尺寸
 local DEFAULT_MIN_Z = -10000-- 默认地图尺寸
+
+local MONSTER_UID_BASE = 1000000 -- 怪物uid偏移
 
 local SKILL_RANGE       = 10.0
 local SKILL_COOLDOWN    = 0.5
@@ -305,7 +309,7 @@ function Scene:CastSkill(uid, req, now)
     end
 
     return {
-        code = 0,
+        code = SKILL_OK,
         targetUid = target.uid,
         damage = SKILL_DAMAGE,
         targetHp = target.hp,
@@ -314,6 +318,56 @@ function Scene:CastSkill(uid, req, now)
         dead = dead,
         deadReceivers = dead and receives or {},
     }
+end
+
+function Scene:AddUnit(unit)
+    self.units[unit.uid] = unit
+    self:AddToGrid(unit)
+end
+
+function Scene:AddMonster(entityId, x, z)
+    local cfg = ConfigRepository.Get("tbsceneentity")[entityId]
+    if not cfg then
+        Logger.Error("[Scene]AddMonster: unknown entityId:%s", entityId)
+        return nil
+    end
+
+    local unit = MonsterUnit.new(entityId, x, z)
+    unit.uid = MONSTER_UID_BASE + entityId
+    unit.hp = cfg.BaseHP
+    unit.maxHp = cfg.BaseHP
+    unit.speed = cfg.MoveSpeed
+    unit.sight = cfg.Sight
+    unit.aiType = cfg.AI[1]
+
+    self:AddUnit(unit)
+    return unit
+end
+
+function Scene:UpdateAI(now)
+    local events = {}
+    for _, unit in pairs(self.units) do
+        if not unit.dead then
+            unit:UpdateAI(self, now, events)
+        end
+    end
+    return events
+end
+
+---@param monster MonsterUnit
+function Scene:FindNearestPlayer(monster)
+    local best, bestDist
+    for _, u in pairs(self.units) do
+        if u:IsPlayer() and not u.dead then
+            local d = math.sqrt((u.x - monster.x)^2 + (u.z - monster.z)^2)
+            if d <= monster.sight and (not best or d < bestDist) then
+                best = u
+                bestDist = d
+            end
+        end
+    end
+
+    return best
 end
 
 return Scene

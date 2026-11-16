@@ -21,6 +21,7 @@ function ServiceLauncher.Start(name, ...)
 
     if not ok then
         skynet.error(("service_launcher: %s 启动失败: %s"):format(name, tostring(result)))
+        skynet.sleep(100)
         skynet.abort()
         return nil
     end

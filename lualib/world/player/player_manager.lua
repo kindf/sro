@@ -1,6 +1,8 @@
 local Class = require "common.class"
 local Player = require "world.player.player"
 local Logger = require "common.logger"
+local ProtocolHelper = require "protocol.protocol_helper"
+
 
 ---@class PlayerManager
 ---@field players table<integer, Player>
@@ -77,6 +79,85 @@ function PlayerManager:SendUidPacket(uid, packet)
     local player = self.playersUidMap[uid]
     if player then
         player:SendPackage(packet)
+    end
+end
+
+---@param player Player
+function PlayerManager:ApplySceneChange(player, data, sceneId, sendResp)
+    if not data or data.same then
+        return
+    end
+
+    local pm = self
+
+    -- 旧邻居看到 Leave
+    if data.oldUnit then
+        local leave = ProtocolHelper.EncodePTCPacket("Scene.UnitLeave", {
+            uid = player.uid,
+        })
+        for _, u in ipairs(data.oldOthers or {}) do
+            pm:SendUidPacket(u.uid, leave)
+        end
+    end
+
+    -- 自己看到新邻居
+    for _, u in ipairs(data.newOthers or {}) do
+        player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.UnitEnter", u))
+    end
+
+    -- 新邻居看到自己
+    local enter = ProtocolHelper.EncodePTCPacket("Scene.UnitEnter", data.newUnit)
+    for _, u in ipairs(data.newOthers or {}) do
+        pm:SendUidPacket(u.uid, enter)
+    end
+
+    -- 只有显式切场景才回 RespEnter
+    if sendResp then
+        player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.RespEnter", {
+            sceneId = sceneId,
+            x = data.newUnit.x,
+            y = data.newUnit.y,
+            z = data.newUnit.z,
+        }))
+    end
+end
+
+function PlayerManager:OnSceneEvent(events)
+    for _, e in ipairs(events) do
+        if e.kind == "move" then
+            local m = e.result
+            local packet = ProtocolHelper.EncodePTCPacket("Scene.RespMove", {
+                common = 0,
+                time = m.time,
+                dx = m.dx,
+                dy = m.dy,
+                dz = m.dz,
+                uid = e.uid,
+            })
+            self:SendUidsPacket(m.receivers, packet)
+
+            for _, u in ipairs(m.enters or {}) do            
+                local packet1 = ProtocolHelper.EncodePTCPacket("Scene.UnitMove",  u)
+                self:SendUidPacket(u.uid, packet1)
+            end
+
+            local packet2 = ProtocolHelper.EncodePTCPacket("Scene.UnitLeave", {uid = e.uid})
+            for _, uid in ipairs(m.leaves or {}) do
+                self:SendUidPacket(uid, packet2)
+            end
+        elseif e.kind == "hp" then
+            local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitHp", {
+                uid = e.uid,
+                hp = e.hp,
+                maxHp = e.maxHp
+            })
+            self:SendUidsPacket(e.receivers, packet)
+        elseif e.kind == "dead" then
+            local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitDead", {
+                uid = e.uid,
+            })
+            self:SendUidsPacket(e.receivers, packet)
+        end
     end
 end
 

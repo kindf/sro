@@ -27,6 +27,8 @@ message UnitEnter {
     optional int32 common = 5;
     optional int32 hp = 6;
     optional int32 maxHp = 7;
+    optional uint32 entityId = 8;   // 怪物/角色模板 id，玩家为 0
+    optional uint32 unitType = 9;   // 0 玩家，1 怪物
 }
 
 message UnitLeave {

@@ -32,7 +32,7 @@ function CMD.player_socket_ready(fd, addr)
     player = PlayerLoader.LoadPlayer(fd, addr)
     PlayerManager.GetInstance():AddPlayer(player.uid, player)
     local data = player:OnBorn()
-    ApplySceneChange(player, data, player.sceneId, false)
+    PlayerManager.GetInstance():ApplySceneChange(player, data, player.sceneId, false)
 end
 
 local function LeaveScene(fd, callback)
@@ -66,6 +66,14 @@ function CMD.player_socket_error(fd)
     end)
     Logger.Info( "[World]Socket error fd:%s", tostring(fd))
 end
+
+function CMD.scene_events(events)
+    local pm = PlayerManager.GetInstance()
+    for _, e in ipairs(events) do
+        pm:OnSceneEvent(e)
+    end
+end
+
 -- 分发
 function Handler.ClientDispatch(fd, id, flag, tag, body, ...)
     local protoName = Pids[id]

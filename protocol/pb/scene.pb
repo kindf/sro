@@ -1,5 +1,5 @@
 
-È
+€
 scene.protoScene"e
 ReqMove
 common (Rcommon
@@ -14,7 +14,7 @@
 dy (Rdy
 dz (Rdz
 forced (Rforced
-uid (Ruid"…
+uid (Ruid"½
 	UnitEnter
 uid (Ruid
 x (Rx
@@ -22,7 +22,9 @@
 z (Rz
 common (Rcommon
 hp (Rhp
-maxHp (RmaxHp"
+maxHp (RmaxHp
+entityId (RentityId
+unitType	 (RunitType"
 	UnitLeave
 uid (Ruid"F
 ReqCastSkill

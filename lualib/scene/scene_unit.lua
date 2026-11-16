@@ -33,6 +33,17 @@ function SceneUnit:Ctor()
     self.skillCooldown = {}
 end
 
+function SceneUnit:UndataAI(scene, now, events)
+end
+
+function SceneUnit:IsPlayer()
+    return true
+end
+
+function SceneUnit:IsMonster()
+    return false
+end
+
 function SceneUnit:Pack()
     return {
         uid = self.uid,
