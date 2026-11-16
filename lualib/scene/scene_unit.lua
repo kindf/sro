@@ -33,7 +33,7 @@ function SceneUnit:Ctor()
     self.skillCooldown = {}
 end
 
-function SceneUnit:UndataAI(scene, now, events)
+function SceneUnit:UpdateAI(scene, now, events)
 end
 
 function SceneUnit:IsPlayer()

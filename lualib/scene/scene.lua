@@ -326,7 +326,7 @@ function Scene:AddUnit(unit)
 end
 
 function Scene:AddMonster(entityId, x, z)
-    local cfg = ConfigRepository.Get("tbsceneentity")[entityId]
+    local cfg = ConfigRepository.Get("tbentitytable")[entityId]
     if not cfg then
         Logger.Error("[Scene]AddMonster: unknown entityId:%s", entityId)
         return nil
