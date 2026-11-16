@@ -1,4 +1,5 @@
 local Class = require "common.class"
+local Logger = require "common.logger"
 
 ---@class SceneUnit
 ---@field uid number
@@ -44,6 +45,9 @@ function SceneUnit:IsMonster()
     return false
 end
 
+function SceneUnit:AddHatred(uid, threat, now)
+    Logger.Error("Unit 没有仇恨机制")
+end
 function SceneUnit:Pack()
     return {
         uid = self.uid,

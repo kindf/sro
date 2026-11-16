@@ -6,6 +6,17 @@ local ATTACK_CD = 1.0
 local ATTACK_DAMAGE = 50
 
 ---@class MonsterUnit:SceneUnit
+---@field entityId number
+---@field speed number
+---@field sight number
+---@field aiType string
+---@field targetUid number
+---@field nextAttackAt number
+---@field spawnX number
+---@field spawnZ number
+---@field state string
+---@field hatred table<number, table>
+---@field leashRange number
 local MonsterUnit = Class("MonsterUnit", SceneUnit)
 
 function MonsterUnit:Ctor(entityId, x, z)
@@ -18,6 +29,9 @@ function MonsterUnit:Ctor(entityId, x, z)
     self.targetUid = nil
     self.nextAttackAt = 0
     self.spawnX, self.spawnZ = x, z
+    self.state = "idle" -- idle / chase / attack / return
+    self.hatred = {} -- uid -> {treat = number, at = now}
+    self.leashRange = 15.0 -- 离出生点脱战距离
 end
 
 function MonsterUnit:Pack()
@@ -37,67 +51,159 @@ end
 
 --- @param scene Scene
 function MonsterUnit:UpdateAI(scene, now, events)
-    local target = scene:FindNearestPlayer(self)
+    local dt = 0.3
+    local homeDist = math.sqrt((self.x - self.spawnX)^2 + (self.z - self.spawnZ)^2)
+
+    -- 脱战
+    if self.state == "return" then
+        if homeDist <= 0.5 then
+            self.hp = self.maxHp
+            self.state = "idle"
+            self.hatred = {}
+
+            local set = scene:GetNeighborSet(self.gx, self.gz)
+            local receivers = {}
+            for id in pairs(set) do
+                table.insert(receivers, id)
+            end
+
+            table.insert(events, {
+                kinf = "hp",
+                uid = self.uid,
+                hp = self.hp,
+                maxHp = self.maxHp,
+                receivers = receivers,
+            })
+        else
+            self:StepTo(scene, self.spawnX, self.spawnZ, dt, events)
+        end
+        return
+    end
+
+    local target = self:PickTarget(scene, now)
     if not target then
+        self.state = homeDist > 0.5 and "return" or "idle"
+        return
+    end
+
+    if homeDist > self.leashRange then
+        self.hatred = {}
+        self.state = "return"
         return
     end
 
     local dist = math.sqrt((target.x - self.x)^2 + (target.z - self.z)^2)
-    if dist < ATTACK_RANGE then
-        local dt = 0.3
-        local step = math.min(self.speed * dt, dist - 1.0)
-        local nx = self.x + (target.x - self.x) / dist * step
-        local nz = self.z + (target.z - self.z) / dist * step
 
-        local result = scene:Move(self.uid, {
-            common = 0,
-            time = dt,
-            dx = nx,
-            dy = self.y,
-            dz = nz,
-        })
+    if dist > self.sight * 1.5 then
+        self.hatred = {}
+        self.state = "return"
+        return
+    end
 
-        if result and not result.forced then
-            table.insert(events, {
-                kind = "move",
-                uid = self.uid,
-                result = result,
-            })
-        end
-    elseif now >= self.nextAttackAt then
-        self.nextAttackAt = now + ATTACK_CD
-        target.hp = math.max(0, target.hp - ATTACK_DAMAGE)
-        
-        local dead = false
-        if target.hp == 0 and not target.dead then
-            target.dead = true
-            dead = true
-        end
+    if dist > ATTACK_RANGE then
+        self.state = "chase"
+        self:StepTo(scene, target.x, target.z, dt, events)
+        return
+    end
 
-        local set = scene:GetNeighborSet(target.gx, target.gz)
-        local receivers = {}
+    self.state = "attack"
+    if now < self.nextAttackAt then
+        return
+    end
 
-        for id in pairs(set) do
-            table.insert(receivers, id)
-        end
+     self.nextAttackAt = now + ATTACK_CD
+    target.hp = math.max(0, target.hp - ATTACK_DAMAGE)
 
+    local dead = false
+    if target.hp == 0 and not target.dead then
+        target.dead = true
+        dead = true
+    end
+
+    local set = scene:GetNeighborSet(target.gx, target.gz)
+    local receivers = {}
+    for id in pairs(set) do
+        receivers[#receivers + 1] = id
+    end
+
+    table.insert(events, {
+        kind = "hp",
+        uid = target.uid,
+        hp = target.hp,
+        maxHp = target.maxHp,
+        receivers = receivers,
+    })
+    if dead then
         table.insert(events, {
-            kind = "hp",
+            kind = "dead",
             uid = target.uid,
-            hp = target.hp,
-            maxHp = target.maxHp,
-            dead = dead,
             receivers = receivers,
         })
+    end
+end
 
-        if dead then
-            table.insert(events, {
-                kind = "dead",
-                uid = target.uid,
-                receivers = receivers,
-            })
+function MonsterUnit:AddHatred(uid, threat, now)
+    local h = self.hatred[uid]
+    if not h then
+        h = {treat = threat, at = now}
+        self.hatred[uid] = h
+    end
+
+    h.threat = h.threat + threat
+    h.at = now
+end
+
+-- 优先仇恨最高；没有仇恨再找视野内最近的玩家
+---@param scene Scene
+function MonsterUnit:PickTarget(scene, now)
+    local best, bestThreat
+    for uid, h in pairs(self.hatred) do
+        local u = scene:GetUnit(uid)
+        if not u or u.dead or now - h.at > 10 then
+            self.hatred[uid] = nil
+        elseif not bestThreat or h.threat > bestThreat then
+            best, bestThreat = u, h.threat
         end
     end
+    if best then
+        return best
+    end
+
+    return scene:FindNearestPlayer(self)
+end
+
+---@param scene Scene
+---@param x number
+---@param z number
+---@param dt number
+---@param events table
+function MonsterUnit:StepTo(scene, x, z, dt, events)
+    local dx, dz = x - self.x, z - self.z
+    local dist = math.sqrt(dx * dx + dz * dz)
+    if dist < 0.01 then
+        return true
+    end
+
+    local step = math.min(self.speed * dt, dist)
+    local nx = self.x + dx / dist * step
+    local nz = self.z + dz / dist * step
+
+    local result = scene:Move(self.uid, {
+        common = 0,
+        time = dt,
+        dx = nx,
+        dy = self.y,
+        dz = nz,
+    })
+
+    if result and not result.forced then
+        table.insert(events, {
+            kind = "move",
+            uid = self.uid,
+            result = result,
+        })
+    end
+    return dist <= step
 end
 
 return MonsterUnit

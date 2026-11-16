@@ -295,6 +295,12 @@ function Scene:CastSkill(uid, req, now)
 
     unit.skillCooldown[skillId] = now
     target.hp = math.max(0, target.hp - SKILL_DAMAGE)
+
+    -- 仇恨
+    if target:IsMonster() then
+        target:AddHatred(uid, SKILL_DAMAGE, now)
+    end
+    
     local dead = false
     if target.hp <= 0 and target.dead == false then
         target.dead = true
