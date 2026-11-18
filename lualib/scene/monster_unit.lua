@@ -30,6 +30,7 @@ function MonsterUnit:Ctor(entityId, x, z)
     self.targetUid = nil
     self.nextAttackAt = 0
     self.spawnX, self.spawnZ = x, z
+    self.x, self.z = x, z
     self.state = "idle" -- idle / chase / attack / return
     self.hatred = {} -- uid -> {treat = number, at = now}
     self.leashRange = 15.0 -- 离出生点脱战距离
@@ -75,7 +76,7 @@ function MonsterUnit:UpdateAI(scene, now, events)
             end
 
             table.insert(events, {
-                kinf = "hp",
+                kind = "hp",
                 uid = self.uid,
                 hp = self.hp,
                 maxHp = self.maxHp,
@@ -154,10 +155,11 @@ function MonsterUnit:UpdateAI(scene, now, events)
     end
 end
 
+-- 首次命中从零累计仇恨；以后命中刷新该来源的最后攻击时间。
 function MonsterUnit:AddHatred(uid, threat, now)
     local h = self.hatred[uid]
     if not h then
-        h = {treat = threat, at = now}
+        h = {threat = 0}
         self.hatred[uid] = h
     end
 
@@ -202,14 +204,14 @@ function MonsterUnit:StepTo(scene, x, z, dt, events)
 
     local node = self.path and self.path[self.pathIndex]
     if not node then
-        -- 没有路径：直线兜底
-        return self:StepDirect(scene, x, z, dt, events)
+        -- 目标不可达时原地等待，下一次 AI 更新将重新评估目标。
+        return false
     end
 
     local dx, dz = node.x - self.x, node.z - self.z
     local dist = math.sqrt(dx * dx + dz * dz)
 
-    if dist < 0.3 then
+    if dist == 0 then
         self.pathIndex = self.pathIndex + 1
         return false
     end
@@ -218,15 +220,21 @@ function MonsterUnit:StepTo(scene, x, z, dt, events)
     local nx = self.x + dx / dist * step
     local nz = self.z + dz / dist * step
 
-    local node = self.path[self.pathIndex]
     local result = scene:Move(self.uid, {
         common = 0, time = dt,
-        dx = nx, dy = node.h or self.y, dz = nz,
+        dx = nx, dy = self.y, dz = nz,
     })
     if result and not result.forced then
-        events[#events + 1] = { kind = "move", uid = self.uid, result = result }
+        table.insert(events, {
+            kind = "move", uid = self.uid, result = result,
+            unit = #result.enters > 0 and self:Pack() or nil,
+        })
+        if step == dist then
+            self.pathIndex = self.pathIndex + 1
+            return true
+        end
     end
-    return dist <= step
+    return false
 end
 
 function MonsterUnit:TryCastSkills(scene, target, now, events)
@@ -267,6 +275,12 @@ function MonsterUnit:TryCastSkills(scene, target, now, events)
                     duration = buff.duration,
                     receivers = buff.receivers,
                 }
+                local attr = buff.attr
+                table.insert(events, {
+                    kind = "attr", uid = buff.uid, receivers = buff.receivers,
+                    atk = attr.atk, def = attr.def, maxHp = attr.maxHp, hp = attr.hp,
+                    maxSp = attr.maxSp, sp = attr.sp,
+                })
             end
             return true
         end

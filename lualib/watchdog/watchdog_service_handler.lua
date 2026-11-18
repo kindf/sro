@@ -1,4 +1,5 @@
 local skynet = require "skynet"
+local socketdriver = require "skynet.socketdriver"
 local Logger = require "common.logger"
 local Handler = {}
 local gate
@@ -13,6 +14,8 @@ local tostring = tostring
 -- 使用单向消息，不在清理过程中让出协程。
 local function closeClient(fd, command)
     connections[fd] = nil
+    -- 玩家会话已经结束，丢弃积压的广播；kick 同时移除 gate 对 fd 的登记。
+    socketdriver.shutdown(fd)
     skynet.send(gate, "lua", "kick", fd)
     skynet.send(".world", "lua", command, fd)
 end
@@ -28,32 +31,19 @@ function CMD.start(conf)
     return true
 end
 
--- 建立玩家后启用转发；两次 call 都可能让出协程，恢复后需检查连接是否已关闭。
+-- world 串行完成转发和玩家入场。等待期间若已断开，清理消息已交给 world。
 function Socket.open(fd, addr)
     local connection = {}
     connections[fd] = connection
     Logger.Info("[WatchDog]open New client from:%s fd:%s",addr, tostring(fd))
-    -- 先让 world 建好 player，并拿到 world 地址
-    local called, world = skynet.call(".world", "lua", "player_socket_accept", fd, addr)
+    local delivered, handled, accepted = pcall(skynet.call, ".world", "lua", "player_socket_accept", fd, addr, gate)
     if connections[fd] ~= connection then
         return
     end
-    if not called then
+    if not delivered or not handled or not accepted then
         closeClient(fd, "player_socket_close")
-        return Logger.Error("[WatchDog]world accept_client failed fd:%s err:%s", tostring(fd), tostring(world))
+        Logger.Warning("[WatchDog]world accept failed fd:%s err:%s", tostring(fd), tostring(accepted or handled))
     end
-    -- 再把这条 fd 的后续数据转发给 world
-    -- 标准 gate.forward 成功时没有返回值，pcall 的状态才表示调用是否成功。
-    local fok, ferr = pcall(skynet.call, gate, "lua", "forward", fd, 0, world)
-    if not fok then
-        -- 连接在 accept 和 forward 之间断开了，回滚 player
-        if connections[fd] == connection then
-            closeClient(fd, "player_socket_close")
-        end
-        Logger.Error("[WatchDog]gate forward failed fd:%s err:%s", tostring(fd), tostring(ferr))
-        return
-    end
-    skynet.call(".world", "lua", "player_socket_ready", fd, addr)
 end
 
 -- 对端关闭后清理玩家，并释放 gate 中处于半关闭状态的 socket。

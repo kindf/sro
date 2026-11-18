@@ -44,8 +44,14 @@ function CMD.revive(uid)
     return SceneManager.GetInstance():Revice(uid)
 end
 
-function CMD.pickup(uid, targetUid)
-    return SceneManager.GetInstance():Pickup(uid, targetUid)
+-- 预检或领取目标掉落，由 world 在确认背包容量后发起正式领取。
+function CMD.pickup(uid, targetUid, preview)
+    return SceneManager.GetInstance():Pickup(uid, targetUid, preview)
+end
+
+-- 将背包物品生成到玩家所在场景，成功后 world 扣除物品。
+function CMD.drop_item(uid, itemId, count)
+    return SceneManager.GetInstance():DropItem(uid, itemId, count)
 end
 
 function CMD.apply_buff(uid, buffId)

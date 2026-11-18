@@ -17,22 +17,18 @@ function CMD.start()
 end
 
 
-function CMD.player_socket_accept(fd, addr)
-    Logger.Info("[World]accept New client from:%s fd:%s",addr, tostring(fd))
-    return skynet.self()
-end
-
-function CMD.player_socket_ready(fd, addr)
-    Logger.Info("[World]socket ready from:%s fd:%s",addr, tostring(fd))
-    local player = PlayerManager.GetInstance():GetPlayerByFd(fd)
-    if player then
-        Logger.Error("[World]accept New client from:%s fd:%s",addr, tostring(fd))
-        return
-    end
-    player = PlayerLoader.LoadPlayer(fd, addr)
-    PlayerManager.GetInstance():AddPlayer(player.uid, player)
+-- 与首包和断开通知共用 world 的 PlayerQueue。转发开启后才能写 socket，
+-- 而排队的首包须等本命令完成入场后才能分发。异常由 watchdog 统一清理。
+function CMD.player_socket_accept(fd, addr, gate)
+    local manager = PlayerManager.GetInstance()
+    assert(not manager:GetPlayerByFd(fd), "fd already registered")
+    skynet.call(gate, "lua", "forward", fd, 0, skynet.self())
+    local player = PlayerLoader.LoadPlayer(fd, addr)
+    manager:AddPlayer(player.uid, player)
     local data = player:OnBorn()
-    PlayerManager.GetInstance():ApplySceneChange(player, data, player.sceneId, false)
+    assert(data, "could not enter starting scene")
+    manager:ApplySceneChange(player, data, player.sceneId, false)
+    return true
 end
 
 local function LeaveScene(fd, callback)
@@ -67,11 +63,9 @@ function CMD.player_socket_error(fd)
     Logger.Info( "[World]Socket error fd:%s", tostring(fd))
 end
 
+-- 将本次场景更新产生的一批事件按原顺序交给广播逻辑。
 function CMD.scene_events(events)
-    local pm = PlayerManager.GetInstance()
-    for _, e in ipairs(events) do
-        pm:OnSceneEvent(e)
-    end
+    PlayerManager.GetInstance():OnSceneEvents(events)
 end
 
 -- 分发

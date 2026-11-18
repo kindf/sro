@@ -122,7 +122,8 @@ function PlayerManager:ApplySceneChange(player, data, sceneId, sendResp)
     end
 end
 
-function PlayerManager:OnSceneEvent(events)
+-- 按场景结算顺序广播，移动单位的快照仅发给刚进入其视野的玩家。
+function PlayerManager:OnSceneEvents(events)
     for _, e in ipairs(events) do
         if e.kind == "move" then
             local m = e.result
@@ -136,9 +137,11 @@ function PlayerManager:OnSceneEvent(events)
             })
             self:SendUidsPacket(m.receivers, packet)
 
-            for _, u in ipairs(m.enters or {}) do            
-                local packet1 = ProtocolHelper.EncodePTCPacket("Scene.UnitMove",  u)
-                self:SendUidPacket(u.uid, packet1)
+            if e.unit then
+                local enter = ProtocolHelper.EncodePTCPacket("Scene.UnitEnter", e.unit)
+                for _, neighbor in ipairs(m.enters) do
+                    self:SendUidPacket(neighbor.uid, enter)
+                end
             end
 
             local packet2 = ProtocolHelper.EncodePTCPacket("Scene.UnitLeave", {uid = e.uid})
@@ -157,7 +160,7 @@ function PlayerManager:OnSceneEvent(events)
                 uid = e.uid,
             })
             self:SendUidsPacket(e.receivers, packet)
-        elseif e.kinf == "leave" then
+        elseif e.kind == "leave" then
             local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitLeave", {uid = e.uid})
             self:SendUidsPacket(e.receivers, packet)
         elseif e.kind == "enter" then
@@ -174,6 +177,7 @@ function PlayerManager:OnSceneEvent(events)
             local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitAttr", {
                 uid = e.uid, atk = e.atk, def = e.def,
                 maxHp = e.maxHp, hp = e.hp,
+                maxSp = e.maxSp, sp = e.sp,
             })
             self:SendUidsPacket(e.receivers, packet)
         end

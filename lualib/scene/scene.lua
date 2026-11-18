@@ -4,6 +4,7 @@ local Logger = require "common.logger"
 local MonsterUnit = require "lualib.scene.monster_unit"
 local ConfigRepository = require "common.config_repository"
 local DropUnit = require("lualib.scene.drop_unit")
+local skynet = require "skynet"
 
 local MAX_SPEED       = 6.0   -- 占位，后面从属性表取
 local SPEED_TOLERANCE = 2.0   -- 允许 2 倍速度
@@ -44,7 +45,7 @@ local ATTR_MAP = {
 }
 
 local function IsEnemy(a, b)
-    return a:IsMonster() ~= b:IsMonster()
+    return (a:IsMonster() and b:IsPlayer()) or (a:IsPlayer() and b:IsMonster())
 end
 
 ---@class Scene
@@ -66,7 +67,7 @@ function Scene:Ctor(cfg)
     self.grids = {}
 
     self.startPos = cfg.StartPos and cfg.StartPos[1] or {0, 0, 0}
-    self.startFace = cfg.StartFace or 0
+    self.startFace = math.floor(cfg.StartFace or 0)
 
     local size = cfg.MapSize and cfg.MapSize[1] or 0
     local offset = cfg.MapOffset and cfg.MapOffset[1] or {0, 0}
@@ -75,7 +76,7 @@ function Scene:Ctor(cfg)
         self.minX, self.maxX = offset[1], offset[1] + size
         self.minZ, self.maxZ = offset[2], offset[2] + size
     else
-        self.minX, self.maxX = -DEFAULT_MIN_X, DEFAULT_MAX_X
+        self.minX, self.maxX = DEFAULT_MIN_X, DEFAULT_MAX_X
         self.minZ, self.maxZ = DEFAULT_MIN_Z, DEFAULT_MAX_Z
     end
 
@@ -144,10 +145,10 @@ function Scene:Enter(uid, x, y, z)
     local unit = SceneUnit.new()
     unit.uid = uid
     unit.x = x
-    unit.y = y
+    unit.y = self:GetHeight(x, z) or y
     unit.z = z
     unit.face = self.startFace or 0
-    unit.lastMoveAt = os.time()
+    unit.lastMoveAt = skynet.now() / 100
     unit.token = TOKEN_MAX
     unit.dead = false
     self.units[uid] = unit
@@ -217,28 +218,23 @@ function Scene:Move(uid, moveContent)
         return _ForcedBack(unit)
     end
 
-    local h = self:GetHeight(dx, dz)
-    if not h then
-        return _ForcedBack(unit)
-    end
-
-    if math.abs(h - unit.y) > HEIGHT_LEGAL_DIFF then
-        return _ForcedBack(unit)
-    end
-
     time = math.max(0, math.min(2, time))
 
-    local now = os.time()
+    local now = skynet.now() / 100
     local dt = now - unit.lastMoveAt
     if dt < 0 then dt = 0 end
     if dt > MAX_DT then dt = MAX_DT end
 
-    unit.token = math.min(TOKEN_MAX, unit.token + dt * TOKEN_REGEN)
+    local availableToken = math.min(TOKEN_MAX, unit.token + dt * TOKEN_REGEN)
     local dist = math.sqrt((dx - unit.x)^2 + (dz - unit.z)^2)
     local cost = dist / (MAX_SPEED * SPEED_TOLERANCE)
-    if cost > unit.token then
+    if cost > availableToken then
         unit.token = 0
         unit.lastMoveAt = now
+        return _ForcedBack(unit)
+    end
+    local canWalk, h = self:CanWalk(unit.x, unit.z, dx, dz)
+    if not canWalk then
         return _ForcedBack(unit)
     end
 
@@ -266,7 +262,7 @@ function Scene:Move(uid, moveContent)
     local common = moveContent.common
     unit.x, unit.y, unit.z = dx, h, dz
     unit.lastMoveAt = now
-    unit.token = unit.token - cost
+    unit.token = availableToken - cost
     unit.face = common & 0xFFFF
     unit.moving = ((common >> 30) & 1) == 1
     self:RemoveFromGrid(unit)
@@ -274,7 +270,7 @@ function Scene:Move(uid, moveContent)
 
     return {
         dx = dx,
-        dy = dy,
+        dy = h,
         dz = dz,
         time = time,
         forced = false,
@@ -288,18 +284,11 @@ function Scene:GetUnit(uid)
     return self.units[uid]
 end
 
+-- 合并同一施法的击杀奖励，每件掉落保留自己的可见玩家。
 local function MergeReward(a, b)
     if not b then return a end
     if not a then
-        return {
-            baseExp = b.baseExp,
-            jobExp = b.jobExp,
-            totalBaseExp = b.totalBaseExp,
-            totalJobExp = b.totalJobExp,
-            level = b.level,
-            drops = b.drops or {},
-            dropReceivers = b.dropReceivers or {},
-        }
+        return b
     end
 
     a.baseExp = a.baseExp + b.baseExp
@@ -310,9 +299,6 @@ local function MergeReward(a, b)
 
     for _, d in ipairs(b.drops or {}) do
         a.drops[#a.drops + 1] = d
-    end
-    for _, uid in ipairs(b.dropReceivers or {}) do
-        a.dropReceivers[uid] = true
     end
     return a
 end
@@ -330,6 +316,10 @@ function Scene:CastSkill(uid, req, now)
 
     if not unit then
         failed.code = SKILL_NOT_SELF
+        return failed
+    end
+    if unit.dead then
+        failed.code = SKILL_CASTER_DEAD
         return failed
     end
 
@@ -355,8 +345,8 @@ function Scene:CastSkill(uid, req, now)
     end
 
     local cooldown = effect.PVECoolTime or 0
-    local last = unit.skillCooldown[req.skillId] or 0
-    if now - last < cooldown then
+    local last = unit.skillCooldown[req.skillId]
+    if last and now - last < cooldown then
         failed.code = SKILL_COOLDOWNING
         return failed
     end
@@ -371,12 +361,12 @@ function Scene:CastSkill(uid, req, now)
         end
         unit.sp = unit.sp - costValue
     end
+    unit.skillCooldown[req.skillId] = now
 
     local ratio = (effect.PVEDamageRadio and effect.PVEDamageRadio[1] or 10000) / 10000
     local static = effect.PVEStaticDam and effect.PVEStaticDam[1] or 0
 
     local hits = {}
-    local deadReceivers = {}
     local rewardTotal = nil
 
     for _, target in ipairs(targets) do
@@ -404,10 +394,14 @@ function Scene:CastSkill(uid, req, now)
         end
 
         local set = self:GetNeighborSet(target.gx, target.gz)
-        set[uid] = nil
-        local receivers = {}
+        local receivers, deadReceivers = {}, {}
         for id in pairs(set) do
-            receivers[#receivers + 1] = id
+            if id ~= uid then
+                table.insert(receivers, id)
+            end
+            if dead then
+                table.insert(deadReceivers, id)
+            end
         end
 
         hits[#hits + 1] = {
@@ -417,7 +411,7 @@ function Scene:CastSkill(uid, req, now)
             maxHp = target.maxHp,
             receivers = receivers,
             dead = dead,
-            deadReceivers = dead and receivers or {},
+            deadReceivers = deadReceivers,
         }
 
         if dead and target:IsMonster() and unit:IsPlayer() then
@@ -447,7 +441,6 @@ function Scene:CastSkill(uid, req, now)
         maxHp = primary.maxHp,
         hits = hits,
         dead = hits[1] and hits[1].dead or false,
-        deadReceivers = deadReceivers,
         reward = rewardTotal,
         buffs = buffs,
     }
@@ -473,27 +466,27 @@ function Scene:GiveReward(player, monster)
     reward.totalBaseExp = player.baseExp
     reward.totalJobExp = player.jobExp
 
+    local receivers = {}
+    for id in pairs(self:GetNeighborSet(monster.gx, monster.gz)) do
+        if self.units[id]:IsPlayer() then
+            table.insert(receivers, id)
+        end
+    end
+
     -- Award：awardId -> pack -> item
     for _, awardId in ipairs(cfg.Award or {}) do
         local items = self:RollAward(awardId)
         for _, item in ipairs(items) do
             local drop = self:DropItem(item.itemId, item.count, monster.x, monster.z)
-            reward.drops[#reward.drops + 1] = drop:Pack()
+            table.insert(reward.drops, {unit = drop:Pack(), receivers = receivers})
         end
     end
 
     -- DropDoodad：直接 {itemId, count}
     for _, d in ipairs(cfg.DropDoodad or {}) do
         local drop = self:DropItem(d[1], d[2] or 1, monster.x, monster.z)
-        reward.drops[#reward.drops + 1] = drop:Pack()
+        table.insert(reward.drops, {unit = drop:Pack(), receivers = receivers})
     end
-
-    local set = self:GetNeighborSet(monster.gx, monster.gz)
-    local receivers = {}
-    for id in pairs(set) do
-        receivers[#receivers + 1] = id
-    end
-    reward.dropReceivers = receivers
 
     return reward
 end
@@ -512,6 +505,9 @@ function Scene:AddMonster(entityId, x, z)
 
     self.monsterSeq = self.monsterSeq + 1
     local unit = MonsterUnit.new(entityId, x, z)
+    unit.y = self:GetHeight(x, z) or self.startPos[2]
+    unit.lastMoveAt = skynet.now() / 100
+    unit.token = TOKEN_MAX
     unit.uid = MONSTER_UID_BASE + self.monsterSeq
     unit.hp = cfg.BaseHP
     unit.maxHp = cfg.BaseHP
@@ -645,17 +641,22 @@ function Scene:DropItem(itemId, count, x, z)
     return unit
 end
 
-function Scene:Pickup(uid, targetUid)
+-- 校验归属场景和距离。预检只返回物品信息，正式拾取会重新校验并移除掉落。
+function Scene:Pickup(uid, targetUid, preview)
     local player = self.units[uid]
     local drop = self.units[targetUid]
 
-    if not player or not drop or not drop:IsDrop() then
+    if not player or not drop or not drop.IsDrop or not drop:IsDrop() then
         return {code = 1} -- 不存在
     end
 
     local dist = math.sqrt((player.x - drop.x)^2 + (player.z - drop.z)^2)
     if dist > 2.0 then
         return {code = 2} -- 太远
+    end
+
+    if preview then
+        return {code = 0, itemId = drop.itemId, count = drop.count}
     end
 
     local set = self:GetNeighborSet(drop.gx, drop.gz)
@@ -781,6 +782,7 @@ function Scene:UpdateBuffs(now, events)
                     kind = "attr", uid = unit.uid,
                     atk = attrs.atk, def = attrs.def,
                     maxHp = attrs.maxHp, hp = attrs.hp,
+                    maxSp = attrs.maxSp, sp = attrs.sp,
                     receivers = receivers,
                 }
             end
@@ -872,10 +874,11 @@ function Scene:RecalcAttr(unit)
              hp = unit.hp, sp = unit.sp }
 end
 
+-- 主目标固定在首位，范围技能额外选取半径内存活的敌对战斗单位。
 function Scene:SelectSkillTargets(uid, skill, effect, primaryUid)
     local caster = self.units[uid]
     local primary = self.units[primaryUid]
-    if not caster or not primary or primary.dead then
+    if not caster or not primary or primary.dead or not (primary:IsMonster() or primary:IsPlayer()) then
         return nil
     end
 
@@ -896,6 +899,7 @@ function Scene:SelectSkillTargets(uid, skill, effect, primaryUid)
             end
         end
     end
+    return targets
 end
 
 function Scene:IsBlocked(x, z)
@@ -929,6 +933,7 @@ local DIRS = {
     {1, 0}, {-1, 0}, {0, 1}, {0, -1},
 }
 
+-- 四邻格 A*，返回从下一步到目标的路点；超出搜索预算或不可达时返回 nil。
 function Scene:FindPath(sx, sz, tx, tz, maxSteps)
     maxSteps = maxSteps or 4000
 
@@ -937,8 +942,14 @@ function Scene:FindPath(sx, sz, tx, tz, maxSteps)
 
     local function key(x,z) return x .. "," .. z end
 
-    local h0 = self:GetHeight(sx, sz)
-    if not h0 then
+    if self:IsBlocked(sx, sz) or self:IsBlocked(tx, tz)
+        or not self:GetHeight(sx, sz) or not self:GetHeight(tx, tz) then
+        return nil
+    end
+    if startX == goalX and startZ == goalZ then
+        if self:CanWalk(sx, sz, tx, tz) then
+            return {{x = tx, z = tz}}
+        end
         return nil
     end
 
@@ -946,11 +957,10 @@ function Scene:FindPath(sx, sz, tx, tz, maxSteps)
         x = startX,
         z = startZ,
         g = 0,
-        h = h0,
+        wx = sx, wz = sz,
+        f = math.abs(goalX - startX) + math.abs(goalZ - startZ),
         parent = nil,
     }
-
-    start.f = start.g + start.h
 
     local open = {start}
     local openMap = {[key(startX, startZ)] = start}
@@ -973,13 +983,12 @@ function Scene:FindPath(sx, sz, tx, tz, maxSteps)
         if cur.x == goalX and cur.z == goalZ then
             local path = {}
             local node = cur
-            while node do
-                local wx, wz = toWorld(self, node.x, node.z)
-                table.insert(path, {x = wx, z = wz})
+            while node.parent do
+                table.insert(path, {x = node.wx, z = node.wz})
                 node = node.parent
             end
             local result = {}
-            for i = #path, 2, -1 do
+            for i = #path, 1, -1 do
                 table.insert(result, path[i])
             end
             return result
@@ -992,14 +1001,16 @@ function Scene:FindPath(sx, sz, tx, tz, maxSteps)
             local k = key(nx, nz)
             if not closed[k] then
                 local wx, wz = toWorld(self, nx, nz)
-                local nh = self:GetHeight(wx, wz)
-                if nh and not self:IsBlocked(wx, wz) and math.abs(nh - cur.h) <= HEIGHT_LEGAL_DIFF then
+                if nx == goalX and nz == goalZ then
+                    wx, wz = tx, tz
+                end
+                if self:CanWalk(cur.wx, cur.wz, wx, wz) then
                     local g = cur.g + 1
-                    local h = nh
+                    local h = math.abs(goalX - nx) + math.abs(goalZ - nz)
                     local f = g + h
                     local node = openMap[k]
                     if not node then
-                        node = {x = nx, z = nz, g = g, h = h, f = f, parent = cur}
+                        node = {x = nx, z = nz, wx = wx, wz = wz, g = g, f = f, parent = cur}
                         table.insert(open, node)
                         openMap[k] = node
                     elseif g < node.g then
@@ -1010,14 +1021,18 @@ function Scene:FindPath(sx, sz, tx, tz, maxSteps)
                 end
             end
         end
-        return nil
     end
+    return nil
 end
 
+-- 高度表以厘米为单位；只有障碍矩形的旧地图使用出生点的平面高度。
 function Scene:GetHeight(x, z)
     local g = self.grid
-    if not g then
+    if not g or x < g.minX or x > g.maxX or z < g.minZ or z > g.maxZ then
         return nil
+    end
+    if not g.cells then
+        return self.startPos[2] or 0
     end
 
     local gx = math.floor((x - g.minX) / g.cell)
@@ -1035,18 +1050,54 @@ function Scene:GetHeight(x, z)
     return v / 100.0
 end
 
+-- 返回线段在单轴投影内的参数区间，用于判定整段是否与障碍矩形相交。
+local function axisInterval(start, delta, low, high)
+    if delta == 0 then
+        if start >= low and start <= high then
+            return 0, 1
+        end
+        return 1, 0
+    end
+    local a, b = (low - start) / delta, (high - start) / delta
+    return math.min(a, b), math.max(a, b)
+end
+
+-- 检查线段经过的障碍和相邻格高差，成功时返回终点地面高度。
 function Scene:CanWalk(fromX, fromZ, toX, toZ)
-    if self:IsBlocked(toX, toZ) then
+    local height, targetHeight = self:GetHeight(fromX, fromZ), self:GetHeight(toX, toZ)
+    if not height or not targetHeight then
         return false
     end
-
-    local h1 = self:GetHeight(fromX, fromZ)
-    local h2 = self:GetHeight(toX, toZ)
-    if not h1 or not h2 then
-        return false
+    local dx, dz = toX - fromX, toZ - fromZ
+    local grid = self.grid
+    for _, r in ipairs(grid.blocked or {}) do
+        local xEnter, xExit = axisInterval(fromX, dx, r.x1, r.x2)
+        local zEnter, zExit = axisInterval(fromZ, dz, r.z1, r.z2)
+        if math.max(0, xEnter, zEnter) <= math.min(1, xExit, zExit) then
+            return false
+        end
     end
-
-    return math.abs(h2 - h1) <= HEIGHT_LEGAL_DIFF
+    if grid.cells then
+        local gx, gz = toCell(self, fromX, fromZ)
+        local endX, endZ = toCell(self, toX, toZ)
+        local stepX, stepZ = dx > 0 and 1 or -1, dz > 0 and 1 or -1
+        while gx ~= endX or gz ~= endZ do
+            -- 比较线段到下一条 X/Z 格线的距离比例；同时到达表示穿过格点。
+            local nextX = gx == endX and math.huge or
+                (grid.minX + (gx + (dx > 0 and 1 or 0)) * grid.cell - fromX) / dx
+            local nextZ = gz == endZ and math.huge or
+                (grid.minZ + (gz + (dz > 0 and 1 or 0)) * grid.cell - fromZ) / dz
+            if nextX <= nextZ then gx = gx + stepX end
+            if nextZ <= nextX then gz = gz + stepZ end
+            local wx, wz = toWorld(self, gx, gz)
+            local nextHeight = self:GetHeight(wx, wz)
+            if not nextHeight or math.abs(nextHeight - height) > HEIGHT_LEGAL_DIFF + 1e-9 then
+                return false
+            end
+            height = nextHeight
+        end
+    end
+    return true, targetHeight
 end
 
 return Scene

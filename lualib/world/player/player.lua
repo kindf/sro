@@ -106,45 +106,34 @@ function Player:Revive()
     return result
 end
 
-function Player:Pickup(targetUid)
-    local ok, data = skynet.call(".scene", "lua", "pickup", self.uid, targetUid)
-    if not ok or not data then
-        return nil
-    end
-    return data
-end
-
-function Player:DropItemToScene(itemId, count)
-    skynet.call(".scene", "lua", "drop_item", self.uid, itemId, count)
-end
-
-
 function Player:GetItemDef(itemId)
     return ConfigRepository.Get("tbitemtable")[itemId]
 end
 
-function Player:AddItem(itemId, count)
+-- 计算完整入包后的格子快照；容量不足时不修改背包。
+function Player:_PlanAddItem(itemId, count)
+    if not count or count <= 0 then
+        return nil, "invalid count"
+    end
     local def = self:GetItemDef(itemId)
-    local overlap = def and def.Overlap or 1
+    local overlap = math.max(1, def and def.Overlap or 1)
     local changed = {}
 
-    for slot = 1, self.maxSlots do
+    for slot = 1, self.maxSlot do
         local item = self.items[slot]
         if item and item.itemId == itemId and item.count < overlap then
             local add = math.min(overlap - item.count, count)
-            item.count = item.count + add
             count = count - add
-            table.insert(changed, {slot = slot, itemId = itemId, count = item.count})
+            table.insert(changed, {slot = slot, itemId = itemId, count = item.count + add})
             if count == 0 then
                 return changed
             end
         end
     end
 
-    for slot = 1, self.maxSlots do
+    for slot = 1, self.maxSlot do
         if not self.items[slot] then
             local add = math.min(overlap, count)
-            self.items[slot] = {itemId = itemId, count = add}
             count = count - add
             table.insert(changed, {slot = slot, itemId = itemId, count = add})
             if count == 0 then
@@ -153,6 +142,61 @@ function Player:AddItem(itemId, count)
         end
     end
     return nil, "bag full"
+end
+
+-- 在 world 的玩家消息队列内提交完整的入包计划；此处不让出协程。
+function Player:_ApplyItemChanges(changed)
+    for _, entry in ipairs(changed) do
+        self.items[entry.slot] = {itemId = entry.itemId, count = entry.count}
+    end
+end
+
+-- 一次性加入整批物品，返回要同步的格子；失败时保留所有原始格子。
+function Player:AddItem(itemId, count)
+    local changed, err = self:_PlanAddItem(itemId, count)
+    if changed then
+        self:_ApplyItemChanges(changed)
+    end
+    return changed, err
+end
+
+-- world 消息队列串行保护背包。先检查完整容量，场景确认取走同一掉落后再提交。
+function Player:Pickup(targetUid)
+    local ok, preview = skynet.call(".scene", "lua", "pickup", self.uid, targetUid, true)
+    if not ok or not preview then
+        return {code = 1}
+    end
+    if preview.code ~= 0 then
+        return preview
+    end
+    local changed = self:_PlanAddItem(preview.itemId, preview.count)
+    if not changed then
+        return {code = 3}
+    end
+    local accepted, result = skynet.call(".scene", "lua", "pickup", self.uid, targetUid)
+    if not accepted or not result then
+        return {code = 1}
+    end
+    if result.code == 0 then
+        self:_ApplyItemChanges(changed)
+        result.changed = changed
+    end
+    return result
+end
+
+-- 场景成功创建掉落后扣除背包格子，调用期间由 world 消息队列保护。
+function Player:DropItem(slot, count)
+    local item = self.items[slot]
+    if not item or count <= 0 then
+        return nil
+    end
+    count = math.min(item.count, count)
+    local ok, data = skynet.call(".scene", "lua", "drop_item", self.uid, item.itemId, count)
+    if not ok or not data then
+        return nil
+    end
+    self:RemoveItem(slot, count)
+    return data
 end
 
 function Player:RemoveItem(slot, count)

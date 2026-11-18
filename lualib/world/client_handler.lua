@@ -51,31 +51,28 @@ end
 ProtocolHelper.RegisterPTCHandler("Scene.ReqEnter", ReqEnter)
 
 ---@param player Player
-local function ReqCaskSkill(player, req)
+-- 每次施法仅回一份完整结果，然后依次同步伤害、状态和击杀奖励。
+local function ReqCastSkill(player, req)
     local data = player:CastSkill(req)
     if not data then
         return
     end
 
-    -- 先回自己
+    local hits = {}
+    for _, h in ipairs(data.hits or {}) do
+        table.insert(hits, {uid = h.uid, damage = h.damage, hp = h.hp, maxHp = h.maxHp})
+    end
     player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.RespCastSkill", {
         code = data.code,
         targetUid = data.targetUid,
         damage = data.damage,
         targetHp = data.targetHp,
+        hits = hits,
     }))
 
     -- 再回目标
     if data.code == 0 then
-        local hits = {}
         for _, h in ipairs(data.hits or {}) do
-            hits[#hits + 1] = {
-                uid = h.uid,
-                damage = h.damage,
-                hp = h.hp,
-                maxHp = h.maxHp,
-            }
-
             -- 每个目标一条 UnitHp
             local hpPacket = ProtocolHelper.EncodePTCPacket("Scene.UnitHp", {
                 uid = h.uid, hp = h.hp, maxHp = h.maxHp,
@@ -88,13 +85,6 @@ local function ReqCaskSkill(player, req)
             end
         end
 
-        player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.RespCastSkill", {
-            code = data.code,
-            targetUid = data.targetUid,
-            damage = data.damage,
-            targetHp = data.targetHp,
-            hits = hits,
-        }))
         -- 2. 技能附带的 Buff
         for _, buff in ipairs(data.buffs or {}) do
             local set = buff.receivers
@@ -125,19 +115,19 @@ local function ReqCaskSkill(player, req)
                 uid = player.uid,
                 baseExp = data.reward.baseExp,
                 jobExp = data.reward.jobExp,
-                totalBaseExp = data.reward.totalBaseExp ,
-                totalJobExp = data.reward.totaljobExp,
+                totalBaseExp = data.reward.totalBaseExp,
+                totalJobExp = data.reward.totalJobExp,
                 level = data.reward.level,
             }))
         end
 
         for _, drop in ipairs(data.reward.drops or {}) do
-            local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitEnter", drop)
-            PlayerManager:GetInstance():SendUidsPacket(data.reward.dropReceivers, packet)
+            local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitEnter", drop.unit)
+            PlayerManager.GetInstance():SendUidsPacket(drop.receivers, packet)
         end
     end
 end
-ProtocolHelper.RegisterPTCHandler("Scene.ReqCastSkill", ReqCaskSkill)
+ProtocolHelper.RegisterPTCHandler("Scene.ReqCastSkill", ReqCastSkill)
 
 ---@param player Player
 local function ReqRevive(player, req)
@@ -162,9 +152,6 @@ ProtocolHelper.RegisterPTCHandler("Scene.ReqRevive", ReqRevive)
 ---@param player Player
 local function ReqPickup(player, req)
     local data = player:Pickup(req.targetUid)
-    if not data then
-        return
-    end
 
     player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.RespPickup", {
         code = data.code,
@@ -173,20 +160,9 @@ local function ReqPickup(player, req)
     }))
 
     if data.code == 0 then
-        local changed, err = player:AddItem(data.itemId, data.count)
-        if not changed then
-            player:DropItemToScene(data.itemId, data.count)
-            player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.RespPickup", {
-                code = 3,
-                itemId = 0,
-                count = 0
-            }))
-            return
-        end
-        player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.RespPickup", {
-            code = 0, itemId = data.itemId, count = data.count
-        }))
-        player:SendItemUpdate(changed)
+        player:SendItemUpdate(data.changed)
+        local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitLeave", {uid = req.targetUid})
+        PlayerManager.GetInstance():SendUidsPacket(data.receivers, packet)
     end
 end
 ProtocolHelper.RegisterPTCHandler("Scene.ReqPickup", ReqPickup)
@@ -239,24 +215,21 @@ ProtocolHelper.RegisterPTCHandler("Scene.ReqUseItem", ReqUseItem)
 
 ---@param player Player
 local function ReqDropItem(player, req)
-    local itemId, count = player:RemoveItem(req.slot, req.count)
-    if not itemId then
+    local data = player:DropItem(req.slot, req.count)
+    if not data then
         player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.RespDropItem", {
             code = 1, itemId = 0, count = 0,
         }))
         return
     end
 
-    local data = player:DropItemToScene(itemId, count)
     player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.RespDropItem", {
-        code = 0, itemId = itemId, count = count,
+        code = 0, itemId = data.unit.entityId, count = data.unit.count,
     }))
     player:SendItems()
     
-    if data and data.unit then
-        local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitEnter", data.unit)
-        PlayerManager.GetInstance():SendUidsPacket(data.receivers, packet)
-    end
+    local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitEnter", data.unit)
+    PlayerManager.GetInstance():SendUidsPacket(data.receivers, packet)
 end
 ProtocolHelper.RegisterPTCHandler("Scene.ReqDropItem", ReqDropItem)
 

@@ -6,6 +6,7 @@ processes are stopped. Existing server configurations and protocol files stay in
 
 import argparse
 import concurrent.futures
+import io
 import pathlib
 import re
 import socket
@@ -23,6 +24,65 @@ def receive_exact(client, size):
         assert data, "server disconnected before response"
         result += data
     return result
+
+
+def read_varint(stream):
+    """Read an integer field from a protobuf response."""
+    value = 0
+    for shift in range(0, 64, 7):
+        byte = stream.read(1)
+        assert byte, "truncated varint in movement response"
+        value |= (byte[0] & 127) << shift
+        if byte[0] < 128:
+            return value
+    raise AssertionError("invalid varint in movement response")
+
+
+def numeric_fields(body):
+    """Decode scalar integer and float fields used by movement and unit notifications."""
+    stream = io.BytesIO(body)
+    fields = {}
+    while stream.tell() < len(body):
+        tag = read_varint(stream)
+        if tag & 7 == 5:
+            fields[tag >> 3] = struct.unpack("<f", stream.read(4))[0]
+        else:
+            assert tag & 7 == 0, f"unexpected numeric field wire type: {tag & 7}"
+            fields[tag >> 3] = read_varint(stream)
+    return fields
+
+
+def receive_packet(client):
+    """Read one server packet and split its header from the protobuf body."""
+    size = struct.unpack(">H", receive_exact(client, 2))[0]
+    response = receive_exact(client, size)
+    pid, flag = struct.unpack("<IB", response[:5])
+    assert flag == 0
+    return pid, response[5:]
+
+
+def check_scene_updates(port, ids):
+    """A stationary player must see a spawned monster move on successive scene ticks."""
+    with socket.create_connection(("127.0.0.1", port), timeout=5) as client:
+        positions = {}
+        moved = set()
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            pid, body = receive_packet(client)
+            if pid == ids["Scene.UnitEnter"]:
+                fields = numeric_fields(body)
+                if fields.get(9) == 1:
+                    positions[fields[1]] = fields[2], fields[4]
+            elif pid == ids["Scene.RespMove"]:
+                fields = numeric_fields(body)
+                uid = fields[7]
+                position = fields[3], fields[5]
+                if uid in positions and positions[uid] != position:
+                    if uid in moved:
+                        return
+                    moved.add(uid)
+                    positions[uid] = position
+        raise AssertionError("spawned monsters did not continue moving")
 
 
 def stop_process(process):
@@ -55,15 +115,7 @@ def main():
     parser.add_argument("--lua-prefix", default="", help="optional diagnostic module overlay")
     args = parser.parse_args()
     pids = pathlib.Path("protocol/pids.lua").read_text()
-    request_id = int(re.search(r'\["Scene.ReqMove"\]=(\d+)', pids)[1])
-    response_id = int(re.search(r'\["Scene.RespMove"\]=(\d+)', pids)[1])
-    # scene.proto: int32 common=1, float time/dx/dy/dz=2/3/4/5.
-    body = b"\x08\x5a" + b"".join(
-        bytes([(field << 3) | 5]) + struct.pack("<f", value)
-        for field, value in [(2, 0.1), (3, 10), (4, 0), (5, 20)]
-    )
-    payload = struct.pack("<IB", request_id, 0) + body
-    packet = struct.pack(">H", len(payload)) + payload
+    ids = {name: int(pid) for name, pid in re.findall(r'\["([^"]+)"\]=(\d+)', pids)}
 
     with socket.socket() as reservation:
         reservation.bind(("127.0.0.1", 0))
@@ -81,10 +133,20 @@ def main():
             server = subprocess.Popen(["./skynet/skynet", str(config)], stdout=output, stderr=output)
             try:
                 wait_for_log(server, log, "Listen on")
+                check_scene_updates(port, ids)
 
                 # Each worker owns its socket; no protocol handshake or artificial delay needed.
                 def connect_cycle(index):
                     """Alternate successful exchanges and disconnects at different packet stages."""
+                    # An exactly representable time distinguishes this client's moves from AOI broadcasts.
+                    move_time = (index % 4096 + 1) / 4096
+                    x, y, z = 155.5, 7.8, 130.5
+                    body = b"\x08\x5a" + b"".join(
+                        bytes([(field << 3) | 5]) + struct.pack("<f", value)
+                        for field, value in enumerate((move_time, x, y, z), 2)
+                    )
+                    payload = struct.pack("<IB", ids["Scene.ReqMove"], 0) + body
+                    packet = struct.pack(">H", len(payload)) + payload
                     with socket.create_connection(("127.0.0.1", port), timeout=3) as client:
                         mode = index % 5
                         if mode == 1:
@@ -97,10 +159,19 @@ def main():
                             client.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
                             return
                         client.sendall(packet * 3)
-                        for _ in range(3):
-                            size = struct.unpack(">H", receive_exact(client, 2))[0]
-                            response = receive_exact(client, size)
-                            assert struct.unpack("<IB", response[:5]) == (response_id, 0)
+                        matched = 0
+                        deadline = time.monotonic() + 3
+                        while matched < 3:
+                            assert time.monotonic() < deadline, "timed out waiting for own movement"
+                            pid, body = receive_packet(client)
+                            if pid != ids["Scene.RespMove"]:
+                                continue
+                            fields = numeric_fields(body)
+                            if fields[2] != move_time or fields[1] != 90:
+                                continue
+                            assert not fields.get(6), "valid move was forced back"
+                            assert (fields[3], fields[5]) == (x, z) and abs(fields[4] - y) < 0.001
+                            matched += 1
 
                 connect_cycle(0)
                 time.sleep(0.2)
@@ -118,7 +189,7 @@ def main():
                         bot = subprocess.Popen(["./skynet/skynet", str(bot_config)],
                                                stdout=bot_output, stderr=bot_output)
                         try:
-                            wait_for_log(bot, bot_log, "收到移动响应")
+                            wait_for_log(bot, bot_log, "[Receive] recv id:Scene.RespMove ")
                         finally:
                             stop_process(bot)
                     assert server.poll() is None, "server crashed after bot shutdown"
@@ -131,7 +202,8 @@ def main():
                 assert after_fds <= before_fds + 2, f"socket leak: {before_fds} -> {after_fds}"
                 content = log.read_text(errors="replace")
                 assert "Player not found" not in content, "forward removed a live player"
-                assert "stack traceback" not in content, "server logged an exception"
+                for line in content.splitlines():
+                    assert "stack traceback" not in line, f"server logged an exception: {line}"
                 print(f"OK reconnect: {args.cycles} connections, {args.bot_cycles} bot restarts, "
                       f"server fds {before_fds} -> {after_fds}")
             except BaseException:
