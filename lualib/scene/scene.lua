@@ -305,14 +305,15 @@ function Scene:CastSkill(uid, req, now)
         failedResult.code = SKILL_TARGET_DEAD
         return failedResult
     end
+    local damage = math.max(1, (unit.atk or 100) - (target.def or 0))
 
     unit.skillCooldown[skillId] = now
-    target.hp = math.max(0, target.hp - SKILL_DAMAGE)
+    target.hp = math.max(0, target.hp - damage)
 
     -- 仇恨
     if target:IsMonster() then
         target.lastAttacker = uid
-        target:AddHatred(uid, SKILL_DAMAGE, now)
+        target:AddHatred(uid, damage, now)
     end
     
     local dead = false
@@ -337,7 +338,7 @@ function Scene:CastSkill(uid, req, now)
     return {
         code = SKILL_OK,
         targetUid = target.uid,
-        damage = SKILL_DAMAGE,
+        damage = damage,
         targetHp = target.hp,
         maxHp = target.maxHp,
         receivers = receives,
@@ -412,6 +413,7 @@ function Scene:AddMonster(entityId, x, z)
     unit.speed = cfg.MoveSpeed
     unit.sight = cfg.Sight
     unit.aiType = cfg.AI[1]
+    unit.atk = cfg.BaseATK > 0 and cfg.BaseATK or 10
 
     self:AddUnit(unit)
     return unit
@@ -446,6 +448,7 @@ function Scene:Update(now)
     local events = {}
     self:UpdateAI(now, events)
     self:UpdateSpawns(now, events)
+    self:UpdateBuffs(now, events)
     return events
 end
 
@@ -615,6 +618,90 @@ function Scene:RollAward(awardId)
     end
 
     return result 
+end
+
+function Scene:ApplyBuff(uid, buffId, now)
+    local unit = self.units[uid]
+    if not unit then
+        return nil
+    end
+
+    local def = ConfigRepository.Get("tbbufftable")[buffId]
+    if not def then
+        return nil
+    end
+
+    local duration = 3600
+    if def.DestoryTiming and def.DestoryTiming[1] and def.DestoryTiming[1][2] then
+        duration = math.floor(def.DestoryTiming[1][2])
+    end
+
+    unit.buffs[buffId] = {
+        expireAt = now + duration,
+    }
+
+    local set = self:GetNeighborSet(unit.gx, unit.gz)
+    local receivers = {}
+    for id in pairs(set) do
+        table.insert(receivers, id)
+    end
+
+    return {
+        uid = uid,
+        buffId = buffId,
+        duration = duration,
+        receivers = receivers,
+    }
+end
+
+function Scene:UpdateBuffs(now, events)
+    for _, unit in pairs(self.units) do
+        for buffId, buff in pairs(unit.buffs or {}) do
+            if now >= buff.expireAt then
+                unit.buffs[buffId] = nil
+                local set = self:GetNeighborSet(unit.gx, unit.gz)
+                local receivers = {}
+                for id in pairs(set) do
+                    table.insert(receivers, id)
+                end
+
+                table.insert(events, {
+                    kind = "buff",
+                    uid = unit.uid,
+                    buffId = buffId,
+                    duration = 0,
+                    receivers = receivers,
+                })
+            end
+        end
+    end
+end
+
+function Scene:SetAttr(uid, attrs, now)
+    local unit = self.units[uid]
+    if not unit then
+        return nil
+    end
+
+    unit.atk = attrs.atk or unit.atk
+    unit.def = attrs.def or unit.def
+    unit.maxHp = attrs.maxHp or unit.maxHp
+    unit.hp = math.min(unit.hp, unit.maxHp)
+
+    local set = self:GetNeighborSet(unit.gx, unit.gz)
+    local receivers = {}
+    for id in pairs(set) do
+        receivers[#receivers + 1] = id
+    end
+
+    return {
+        uid = uid,
+        atk = unit.atk,
+        def = unit.def,
+        maxHp = unit.maxHp,
+        hp = unit.hp,
+        receivers = receivers,
+    }
 end
 
 return Scene

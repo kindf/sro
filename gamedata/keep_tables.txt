@@ -6,3 +6,8 @@ tbentitytable
 tbitemtable
 tbawardtable
 tbawardpacktable
+tbitemfunctiontable
+tbbufftable
+tbequiptable
+tbequippositiontable
+tbattrinfotable

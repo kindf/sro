@@ -1,5 +1,5 @@
 
-£
+é
 scene.protoScene"e
 ReqMove
 common (Rcommon
@@ -91,7 +91,29 @@ ReqUseItem
 RespDropItem
 code (Rcode
 itemId (RitemId
-count (Rcount"$
+count (Rcount"P
+UnitBuff
+uid (Ruid
+buffId (RbuffId
+duration (Rduration"f
+UnitAttr
+uid (Ruid
+atk (Ratk
+def (Rdef
+maxHp (RmaxHp
+hp (Rhp""
+ReqEquipItem
+slot (Rslot"Y
+RespEquipItem
+code (Rcode
+	equipSlot (R	equipSlot
+itemId (RitemId".
+ReqUnequipItem
+	equipSlot (R	equipSlot"[
+RespUnequipItem
+code (Rcode
+	equipSlot (R	equipSlot
+itemId (RitemId"$
 ReqEnter
 sceneId (RsceneId"O
 	RespEnter

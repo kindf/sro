@@ -48,6 +48,14 @@ function CMD.pickup(uid, targetUid)
     return SceneManager.GetInstance():Pickup(uid, targetUid)
 end
 
+function CMD.apply_buff(uid, buffId)
+    return SceneManager.GetInstance():ApplyBuff(uid, buffId, skynet.now() / 100)
+end
+
+function CMD.set_attr(uid, attrs)
+    return SceneManager.GetInstance():SetAttr(uid, attrs, skynet.now() / 100)
+end
+
 Handler.CMD = CMD
 
 return Handler

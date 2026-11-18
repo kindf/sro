@@ -153,6 +153,24 @@ function SceneManager:Pickup(uid, targetUid)
     return scene:Pickup(uid, targetUid)
 end
 
+function SceneManager:ApplyBuff(uid, buffId, now)
+    local scene = self.playerSceneMap[uid]
+    if not scene then
+        Logger.Error("[SceneManager]Revice: Player with uid %s is not in any scene.", tostring(uid))
+        return nil, "not in scene"
+    end
+    return scene:ApplyBuff(uid, buffId, now)
+end
+
+function SceneManager:SetAttr(uid, attrs, now)
+    local scene = self.playerSceneMap[uid]
+    if not scene then
+        Logger.Error("[SceneManager]Revice: Player with uid %s is not in any scene.", tostring(uid))
+        return nil, "not in scene"
+    end
+    return scene:SetAttr(uid, attrs, now)
+end
+
 ---@type SceneManager
 local GSceneManager = nil
 function SceneManager.GetInstance()

@@ -18,6 +18,9 @@ local Logger = require "common.logger"
 ---@field baseExp number
 ---@field jobExp number
 ---@field level number
+---@field buffs table
+---@field atk number
+---@field def number
 local SceneUnit = Class("SceneUnit")
 
 function SceneUnit:Ctor()
@@ -38,6 +41,9 @@ function SceneUnit:Ctor()
     self.baseExp = 0
     self.jobExp = 0
     self.level = 1
+    self.buffs = {}
+    self.atk = 10
+    self.def = 0
 end
 
 function SceneUnit:UpdateAI(scene, now, events)

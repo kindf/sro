@@ -5,10 +5,20 @@ local skynet = require "skynet"
 local ProtocolHelper = require "protocol.protocol_helper"
 local ConfigRepository = require "common.config_repository"
 
+local ATTR_ATK = 312
+local ATTR_DEF = 186
+
 ---@class Player
 ---@field fd number
 ---@field account string
 ---@field uid number
+---@field sceneId number
+---@field maxSlot number
+---@field items table
+---@field equipment table
+---@field baseAtk number
+---@field baseDef number
+---@field baseMaxHp number
 local Player = Class("Player")
 
 function Player:Ctor()
@@ -18,6 +28,10 @@ function Player:Ctor()
     self.sceneId = 1
     self.maxSlot = 100
     self.items = {}
+    self.equipment = {}
+    self.baseAtk = 10
+    self.baseDef = 0
+    self.baseMaxHp = 1000
 end
 
 function Player:SendPackage(package)
@@ -194,6 +208,110 @@ function Player:SendItemUpdate(changed)
     for _, item in ipairs(changed or {} ) do
         self:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.ItemUpdate", item))
     end
+end
+
+function Player:ApplyBuff(buffId)
+    local ok, data = skynet.call(".scene", "lua", "apply_buff", self.uid, buffId)
+    if not ok or not data then
+        return nil
+    end
+
+    return data
+end
+
+function Player:GetEquipDef(itemId)
+    return ConfigRepository.Get("tbequiptable")[itemId]
+end
+
+function Player:CalcAttr()
+    local atk = self.baseAtk
+    local def = self.baseDef
+    local maxHp = self.baseMaxHp
+
+    for _, itemId in pairs(self.equipment) do
+        local cfg = self:GetEquipDef(itemId)
+        if cfg then
+            for _, entry in ipairs(cfg.BaseAttributes or {}) do
+                local attrId, value = entry[2], entry[3]
+                if attrId == ATTR_ATK then
+                    atk = atk + value
+                elseif attrId == ATTR_DEF then
+                    def = def + value
+                end
+            end
+        end
+    end
+
+    return { atk = atk, def = def, maxHp = maxHp }
+end
+
+function Player:EquipItem(bagSlot)
+    local item = self.items[bagSlot]
+    if not item then
+        return { code = 1 }        -- 背包没有
+    end
+
+    local cfg = self:GetEquipDef(item.itemId)
+    if not cfg then
+        return { code = 2 }        -- 不是装备
+    end
+
+    local equipSlot = cfg.EquipId
+    if not equipSlot or equipSlot == 0 then
+        return { code = 2 }
+    end
+
+    local oldItemId = self.equipment[equipSlot]
+
+    -- 先扣背包
+    self:RemoveItem(bagSlot, 1)
+
+    -- 旧装备回背包
+    if oldItemId then
+        local changed, err = self:AddItem(oldItemId, 1)
+        if not changed then
+            -- 回滚：新装备放回背包，旧装备继续穿着
+            self:AddItem(item.itemId, 1)
+            return { code = 3 }    -- 背包满
+        end
+    end
+
+    self.equipment[equipSlot] = item.itemId
+
+    return {
+        code = 0,
+        equipSlot = equipSlot,
+        itemId = item.itemId,
+    }
+end
+
+function Player:UnequipItem(equipSlot)
+    local itemId = self.equipment[equipSlot]
+    if not itemId then
+        return { code = 1 }
+    end
+
+    local changed, err = self:AddItem(itemId, 1)
+    if not changed then
+        return { code = 3 }        -- 背包满
+    end
+
+    self.equipment[equipSlot] = nil
+
+    return {
+        code = 0,
+        equipSlot = equipSlot,
+        itemId = itemId,
+    }
+end
+
+function Player:SyncAttr()
+    local attrs = self:CalcAttr()
+    local ok, data = skynet.call(".scene", "lua", "set_attr", self.uid, attrs)
+    if not ok then
+        return nil
+    end
+    return data
 end
 
 return Player

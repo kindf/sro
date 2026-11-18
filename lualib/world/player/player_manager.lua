@@ -163,6 +163,13 @@ function PlayerManager:OnSceneEvent(events)
         elseif e.kind == "enter" then
             local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitEnter", e.unit)
             self:SendUidsPacket(e.receivers, packet)
+        elseif e.kind == "buff" then
+            local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitBuff", {
+                uid = e.uid,
+                buffId = e.buffId,
+                duration = e.duration,
+            })
+            self:SendUidsPacket(e.receivers, packet)
         end
     end
 end

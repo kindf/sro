@@ -127,6 +127,40 @@ message RespDropItem {
     required int32 count = 3;
 }
 
+message UnitBuff {
+    required uint64 uid = 1;
+    required uint32 buffId = 2;
+    required int32 duration = 3;   // 秒；0 表示移除
+}
+
+message UnitAttr {
+    required uint64 uid = 1;
+    required int32 atk = 2;
+    required int32 def = 3;
+    required int32 maxHp = 4;
+    required int32 hp = 5;
+}
+
+message ReqEquipItem {
+    required uint32 slot = 1;       // 背包 slot
+}
+
+message RespEquipItem {
+    required int32 code = 1;
+    required uint32 equipSlot = 2;
+    required uint32 itemId = 3;
+}
+
+message ReqUnequipItem {
+    required uint32 equipSlot = 1;
+}
+
+message RespUnequipItem {
+    required int32 code = 1;
+    required uint32 equipSlot = 2;
+    required uint32 itemId = 3;
+}
+
 message ReqEnter {
     required uint32 sceneId = 1;
 }

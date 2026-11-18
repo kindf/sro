@@ -1,6 +1,7 @@
 local Logger = require "common.logger"
 local ProtocolHelper = require "protocol.protocol_helper"
 local PlayerManager = require "world.player.player_manager"
+local ConfigRepository = require "common.config_repository"
 
 ---@param player Player
 local function ReqMove(player, req)
@@ -161,6 +162,25 @@ local function ReqUseItem(player, req)
 
     if data.code == 0 then
         player:SendItems()
+
+        local fn = ConfigRepository.Get("tbitemfunctiontable")[data.itemId]
+        if fn and fn.ItemFunction == 1 then
+            local buffId = fn.ItemFunctionValue and fn.ItemFunctionValue[1]
+            if buffId then
+                local buff = player:ApplyBuff(buffId)
+                if buff then
+                    local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitBuff", {
+                        uid = player.uid,
+                        buffId = buffId,
+                        duration = buff.duration,
+                    })
+                    PlayerManager.GetInstance():SendUidsPacket(buff.receivers, packet)
+                end
+            end
+        else
+            Logger.Warning("[Item] item %s function %s not implemented",
+                tostring(data.itemId), tostring(fn and fn.ItemFunction))
+        end
     end
 end
 ProtocolHelper.RegisterPTCHandler("Scene.ReqUseItem", ReqUseItem)
@@ -187,3 +207,32 @@ local function ReqDropItem(player, req)
     end
 end
 ProtocolHelper.RegisterPTCHandler("Scene.ReqDropItem", ReqDropItem)
+
+local function ReqEquipItem(player, req)
+    local data = player:EquipItem(req.slot)
+    if not data then return end
+
+    player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.RespEquipItem", {
+        code = data.code,
+        equipSlot = data.equipSlot or 0,
+        itemId = data.itemId or 0,
+    }))
+
+    if data.code == 0 then
+        player:SendItems()
+
+        local attr = player:SyncAttr()
+        if attr then
+            local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitAttr", {
+                uid = attr.uid,
+                atk = attr.atk,
+                def = attr.def,
+                maxHp = attr.maxHp,
+                hp = attr.hp,
+            })
+            PlayerManager.GetInstance():SendUidsPacket(attr.receivers, packet)
+        end
+    end
+end
+ProtocolHelper.RegisterPTCHandler("Scene.ReqEquipItem", ReqEquipItem)
+
