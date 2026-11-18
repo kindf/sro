@@ -41,6 +41,9 @@ local ATTR_MAP = {
     [186] = "def",
 }
 
+local function IsEnemy(a, b)
+    return a:IsMonster() ~= b:IsMonster()
+end
 
 ---@class Scene
 ---@field sceneId number
@@ -265,8 +268,36 @@ function Scene:GetUnit(uid)
     return self.units[uid]
 end
 
+local function MergeReward(a, b)
+    if not b then return a end
+    if not a then
+        return {
+            baseExp = b.baseExp,
+            jobExp = b.jobExp,
+            totalBaseExp = b.totalBaseExp,
+            totalJobExp = b.totalJobExp,
+            level = b.level,
+            drops = b.drops or {},
+            dropReceivers = b.dropReceivers or {},
+        }
+    end
+
+    a.baseExp = a.baseExp + b.baseExp
+    a.jobExp = a.jobExp + b.jobExp
+    a.totalBaseExp = b.totalBaseExp
+    a.totalJobExp = b.totalJobExp
+    a.level = b.level
+
+    for _, d in ipairs(b.drops or {}) do
+        a.drops[#a.drops + 1] = d
+    end
+    for _, uid in ipairs(b.dropReceivers or {}) do
+        a.dropReceivers[uid] = true
+    end
+    return a
+end
+
 function Scene:CastSkill(uid, req, now)
-local target = self.units[req.targetUid]
     local unit = self.units[uid]
 
     local failed = {
@@ -281,14 +312,6 @@ local target = self.units[req.targetUid]
         failed.code = SKILL_NOT_SELF
         return failed
     end
-    if not target then
-        failed.code = SKILL_NO_TARGET
-        return failed
-    end
-    if target.uid == uid then
-        failed.code = SKILL_SELF
-        return failed
-    end
 
     local skill = ConfigRepository.Get("tbskilltable")[req.skillId]
     local effect = skill and skill.EffectIDs and skill.EffectIDs[1]
@@ -298,9 +321,15 @@ local target = self.units[req.targetUid]
         return failed
     end
 
-    local range = effect.FarRange or 2.0
-    local dist = math.sqrt((target.x - unit.x)^2 + (target.z - unit.z)^2)
-    if dist > range then
+    local targets = self:SelectSkillTargets(uid, skill, effect, req.targetUid)
+    if not targets then
+        failed.code = SKILL_NO_TARGET
+        return failed
+    end
+
+    local primary = targets[1]
+    local dist = math.sqrt((primary.x - unit.x)^2 + (primary.z - unit.z)^2)
+    if dist > (effect.FarRange or 2.0) then
         failed.code = SKILL_OUT_RANGE
         return failed
     end
@@ -323,35 +352,59 @@ local target = self.units[req.targetUid]
         unit.sp = unit.sp - costValue
     end
 
-    if target.hp <= 0 then
-        failed.code = SKILL_TARGET_DEAD
-        return failed
-    end
-
     local ratio = (effect.PVEDamageRadio and effect.PVEDamageRadio[1] or 10000) / 10000
     local static = effect.PVEStaticDam and effect.PVEStaticDam[1] or 0
 
-    local perHit = math.floor(unit.atk * ratio + static - (target.def or 0))
-    if ratio > 0 and perHit < 1 then
-        perHit = 1
-    end
-    if perHit < 0 then
-        perHit = 0
-    end
+    local hits = {}
+    local deadReceivers = {}
+    local rewardTotal = nil
 
-    local hitCount = effect.AttackCount and effect.AttackCount[1] or 1
-    local totalDamage = 0
+    for _, target in ipairs(targets) do
+        local perHit = math.floor(unit.atk * ratio + static - (target.def or 0))
+        if ratio > 0 and perHit < 1 then perHit = 1 end
+        if perHit < 0 then perHit = 0 end
 
-    for i = 1, hitCount do
-        if target.hp <= 0 then
-            break
+        local totalDamage = 0
+        local hitCount = effect.AttackCount and effect.AttackCount[1] or 1
+
+        for i = 1, hitCount do
+            if target.hp <= 0 then break end
+            target.hp = math.max(0, target.hp - perHit)
+            totalDamage = totalDamage + perHit
         end
-        target.hp = math.max(0, target.hp - perHit)
-        totalDamage = totalDamage + perHit
-    end
 
-    unit.skillCooldown[req.skillId] = now
-    target.hp = math.max(0, target.hp - totalDamage)
+        if target:IsMonster() then
+            target:AddHatred(uid, totalDamage, now)
+        end
+
+        local dead = false
+        if target.hp <= 0 and not target.dead then
+            target.dead = true
+            dead = true
+        end
+
+        local set = self:GetNeighborSet(target.gx, target.gz)
+        set[uid] = nil
+        local receivers = {}
+        for id in pairs(set) do
+            receivers[#receivers + 1] = id
+        end
+
+        hits[#hits + 1] = {
+            uid = target.uid,
+            damage = totalDamage,
+            hp = target.hp,
+            maxHp = target.maxHp,
+            receivers = receivers,
+            dead = dead,
+            deadReceivers = dead and receivers or {},
+        }
+
+        if dead and target:IsMonster() and unit:IsPlayer() then
+            local r = self:GiveReward(unit, target)
+            rewardTotal = MergeReward(rewardTotal, r)
+        end
+    end
 
     local buffs = {}
 
@@ -366,38 +419,16 @@ local target = self.units[req.targetUid]
         end
     end
 
-    if target:IsMonster() then
-        target:AddHatred(uid, totalDamage, now)
-    end
-
-    local dead = false
-    if target.hp <= 0 and not target.dead then
-        target.dead = true
-        dead = true
-    end
-
-    local reward
-    if dead and target:IsMonster() and unit:IsPlayer() then
-        reward = self:GiveReward(unit, target)
-    end
-    
-    local set = self:GetNeighborSet(target.gx, target.gz)
-    set[uid] = nil
-    local receives = {}
-    for id in pairs(set) do
-        table.insert(receives, id)
-    end
-
     return {
         code = SKILL_OK,
-        targetUid = target.uid,
-        damage = totalDamage,
-        targetHp = target.hp,
-        maxHp = target.maxHp,
-        receivers = receives,
-        dead = dead,
-        deadReceivers = dead and receives or {},
-        reward = reward,
+        targetUid = primary.uid,
+        damage = hits[1] and hits[1].damage or 0,
+        targetHp = primary.hp,
+        maxHp = primary.maxHp,
+        hits = hits,
+        dead = hits[1] and hits[1].dead or false,
+        deadReceivers = deadReceivers,
+        reward = rewardTotal,
         buffs = buffs,
     }
 end
@@ -818,6 +849,32 @@ function Scene:RecalcAttr(unit)
 
     return { atk = atk, def = def, maxHp = maxHp, maxSp = maxSp,
              hp = unit.hp, sp = unit.sp }
+end
+
+function Scene:SelectSkillTargets(uid, skill, effect, primaryUid)
+    local caster = self.units[uid]
+    local primary = self.units[primaryUid]
+    if not caster or not primary or primary.dead then
+        return nil
+    end
+
+    local targets = {primary}
+
+    if skill.IsAoe then
+        local radius = effect.EffectRange and effect.EffectRange[1] or 0
+        if radius <= 0 then
+            radius = 3.0
+        end
+
+        for id, u in pairs(self.units) do
+            if id ~= uid and id ~= primaryUid and not u.dead and IsEnemy(caster, u) then
+                local d = math.sqrt((u.x - primary.x)^2 + (u.z - primary.z)^2)
+                if d <= radius then
+                    table.insert(targets, u)
+                end
+            end
+        end
+    end
 end
 
 return Scene

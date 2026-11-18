@@ -1,5 +1,5 @@
 
-ê
+í
 scene.protoScene"e
 ReqMove
 common (Rcommon
@@ -31,12 +31,18 @@
 uid (Ruid"F
 ReqCastSkill
 skillId (RskillId
-	targetUid (R	targetUid"u
+	targetUid (R	targetUid"Z
+SkillHit
+uid (Ruid
+damage (Rdamage
+hp (Rhp
+maxHp (RmaxHp"ö
 RespCastSkill
 code (Rcode
 	targetUid (R	targetUid
 damage (Rdamage
-targetHp (RtargetHp"@
+targetHp (RtargetHp#
+hits (2.Scene.SkillHitRhits"@
 UnitHp
 uid (Ruid
 hp (Rhp

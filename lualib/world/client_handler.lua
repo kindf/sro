@@ -67,12 +67,34 @@ local function ReqCaskSkill(player, req)
 
     -- 再回目标
     if data.code == 0 then
-        local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitHp", {
-            uid = req.targetUid,
-            hp = data.targetHp,
-            maxHp = data.maxHp,
-        })
-        PlayerManager:GetInstance():SendUidsPacket(data.receivers, packet)
+        local hits = {}
+        for _, h in ipairs(data.hits or {}) do
+            hits[#hits + 1] = {
+                uid = h.uid,
+                damage = h.damage,
+                hp = h.hp,
+                maxHp = h.maxHp,
+            }
+
+            -- 每个目标一条 UnitHp
+            local hpPacket = ProtocolHelper.EncodePTCPacket("Scene.UnitHp", {
+                uid = h.uid, hp = h.hp, maxHp = h.maxHp,
+            })
+            PlayerManager.GetInstance():SendUidsPacket(h.receivers, hpPacket)
+
+            if h.dead then
+                local deadPacket = ProtocolHelper.EncodePTCPacket("Scene.UnitDead", { uid = h.uid })
+                PlayerManager.GetInstance():SendUidsPacket(h.deadReceivers, deadPacket)
+            end
+        end
+
+        player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.RespCastSkill", {
+            code = data.code,
+            targetUid = data.targetUid,
+            damage = data.damage,
+            targetHp = data.targetHp,
+            hits = hits,
+        }))
         -- 2. 技能附带的 Buff
         for _, buff in ipairs(data.buffs or {}) do
             local set = buff.receivers

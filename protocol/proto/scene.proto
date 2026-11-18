@@ -41,11 +41,19 @@ message ReqCastSkill {
     required uint64 targetUid = 2;
 }
 
+message SkillHit {
+    required uint64 uid = 1;
+    required int32 damage = 2;
+    required int32 hp = 3;
+    required int32 maxHp = 4;
+}
+
 message RespCastSkill {
     required int32 code = 1;        // 0 成功，非 0 失败
     required uint64 targetUid = 2;
     required int32 damage = 3;
     required int32 targetHp = 4;
+    repeated SkillHit hits = 5;     // AOE 时每个目标一条
 }
 
 message UnitHp {

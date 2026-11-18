@@ -45,6 +45,8 @@ return {
 [1433173853]="Scene.RespUnequipItem",
 ["Scene.RespUseItem"]=1431240320,
 [1431240320]="Scene.RespUseItem",
+["Scene.SkillHit"]=994691294,
+[994691294]="Scene.SkillHit",
 ["Scene.UnitAttr"]=2527629443,
 [2527629443]="Scene.UnitAttr",
 ["Scene.UnitBuff"]=3891393012,
