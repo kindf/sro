@@ -1,5 +1,5 @@
 
-È
+ê
 scene.protoScene"e
 ReqMove
 common (Rcommon
@@ -95,13 +95,15 @@ ReqUseItem
 UnitBuff
 uid (Ruid
 buffId (RbuffId
-duration (Rduration"f
+duration (Rduration"å
 UnitAttr
 uid (Ruid
 atk (Ratk
 def (Rdef
 maxHp (RmaxHp
-hp (Rhp""
+hp (Rhp
+sp (Rsp
+maxSp (RmaxSp""
 ReqEquipItem
 slot (Rslot"Y
 RespEquipItem

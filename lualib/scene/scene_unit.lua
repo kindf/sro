@@ -24,6 +24,9 @@ local Logger = require "common.logger"
 ---@field baseMaxHp number
 ---@field atk number
 ---@field def number
+---@field sp number
+---@field maxSp number
+---@field baseMaxSp number
 local SceneUnit = Class("SceneUnit")
 
 function SceneUnit:Ctor()
@@ -51,6 +54,10 @@ function SceneUnit:Ctor()
     self.baseMaxHp = 1000
     self.atk = 10
     self.def = 0
+
+    self.sp = 100
+    self.maxSp = 100
+    self.baseMaxSp = 100
 end
 
 function SceneUnit:UpdateAI(scene, now, events)

@@ -12,3 +12,5 @@ tbbuffeffecttable
 tbequiptable
 tbequippositiontable
 tbattrinfotable
+tbskilltable
+tbskilleffecttable

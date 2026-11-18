@@ -139,6 +139,8 @@ message UnitAttr {
     required int32 def = 3;
     required int32 maxHp = 4;
     required int32 hp = 5;
+    optional int32 sp = 6;
+    optional int32 maxSp = 7;
 }
 
 message ReqEquipItem {

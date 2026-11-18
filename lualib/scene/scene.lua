@@ -31,6 +31,8 @@ local SKILL_COOLDOWNING = 4
 local SKILL_TARGET_DEAD = 5
 local SKILL_NOT_SELF    = 6
 local SKILL_CASTER_DEAD = 7
+local SKILL_NO_COST = 8
+local SKILL_INVALID = 9
 
 local ATTR_MAP = {
     [51] = "atk",
@@ -264,69 +266,82 @@ function Scene:GetUnit(uid)
 end
 
 function Scene:CastSkill(uid, req, now)
-    local target = req.targetUid
-    local skillId = req.skillId
-    local failedResult = {
-        targetUid = target,
+local target = self.units[req.targetUid]
+    local unit = self.units[uid]
+
+    local failed = {
+        targetUid = req.targetUid,
         damage = 0,
         targetHp = 0,
         maxHp = 0,
         receivers = {},
     }
 
-    local target = self.units[target]
-    if not target then
-        failedResult.code = SKILL_NO_TARGET
-        return failedResult
-    end
-
-    if target.uid == uid then
-        failedResult.code = SKILL_SELF
-        return failedResult
-    end
-
-    local unit = self.units[uid]
     if not unit then
-        failedResult.code = SKILL_NOT_SELF
-        return failedResult
+        failed.code = SKILL_NOT_SELF
+        return failed
+    end
+    if not target then
+        failed.code = SKILL_NO_TARGET
+        return failed
+    end
+    if target.uid == uid then
+        failed.code = SKILL_SELF
+        return failed
     end
 
-    if unit.dead then
-        failedResult.code = SKILL_CASTER_DEAD
-        return failedResult
+    local skill = ConfigRepository.Get("tbskilltable")[req.skillId]
+    local effect = skill and skill.EffectIDs and skill.EffectIDs[1]
+    effect = effect and ConfigRepository.Get("tbskilleffecttable")[effect]
+    if not effect then
+        failed.code = SKILL_INVALID
+        return failed
     end
 
+    local range = effect.FarRange or 2.0
     local dist = math.sqrt((target.x - unit.x)^2 + (target.z - unit.z)^2)
-    if dist > SKILL_RANGE then
-        failedResult.code = SKILL_OUT_RANGE
-        return failedResult
+    if dist > range then
+        failed.code = SKILL_OUT_RANGE
+        return failed
     end
 
-    local last = unit.skillCooldown[skillId] or 0
-    if now - last < SKILL_COOLDOWN then
-        failedResult.code = SKILL_COOLDOWNING
-        return failedResult
+    local cooldown = effect.PVECoolTime or 0
+    local last = unit.skillCooldown[req.skillId] or 0
+    if now - last < cooldown then
+        failed.code = SKILL_COOLDOWNING
+        return failed
+    end
+
+    -- SP 消耗
+    local costType = effect.SkillCost and effect.SkillCost[1]
+    local costValue = effect.SkillCost and effect.SkillCost[2] or 0
+    if costType == 7 then
+        if unit.sp < costValue then
+            failed.code = SKILL_NO_COST
+            return failed
+        end
+        unit.sp = unit.sp - costValue
     end
 
     if target.hp <= 0 then
-        failedResult.code = SKILL_TARGET_DEAD
-        return failedResult
+        failed.code = SKILL_TARGET_DEAD
+        return failed
     end
-    local damage = math.max(1, (unit.atk or 100) - (target.def or 0))
 
-    unit.skillCooldown[skillId] = now
+    local ratio = (effect.PVEDamageRadio and effect.PVEDamageRadio[1] or 10000) / 10000
+    local static = effect.PVEStaticDam and effect.PVEStaticDam[1] or 0
+    local damage = math.max(1, math.floor(unit.atk * ratio + static - (target.def or 0)))
+
+    unit.skillCooldown[req.skillId] = now
     target.hp = math.max(0, target.hp - damage)
 
-    -- 仇恨
     if target:IsMonster() then
-        target.lastAttacker = uid
         target:AddHatred(uid, damage, now)
     end
-    
+
     local dead = false
-    if target.hp <= 0 and target.dead == false then
+    if target.hp <= 0 and not target.dead then
         target.dead = true
-        target.killerUid = unit.uid
         dead = true
     end
 
@@ -697,6 +712,7 @@ function Scene:SetAttr(uid, attrs, now)
     unit.baseAtk = attrs.atk or unit.baseAtk
     unit.baseDef = attrs.def or unit.baseDef
     unit.baseMaxHp = attrs.maxHp or unit.baseMaxHp
+    unit.baseMaxSp = attrs.maxSp or unit.baseMaxSp
 
     local result = self:RecalcAttr(unit)
 
@@ -747,6 +763,7 @@ function Scene:RecalcAttr(unit)
     local atk = unit.baseAtk
     local def = unit.baseDef
     local maxHp = unit.baseMaxHp
+    local maxSp = unit.baseMaxSp
 
     for _, buff in pairs(unit.buffs or {}) do
         for field, value in pairs(buff.attr or {}) do
@@ -756,21 +773,19 @@ function Scene:RecalcAttr(unit)
                 def = def + value
             elseif field == "maxHp" then
                 maxHp = maxHp + value
+            elseif field == "maxSp" then
+                maxSp = maxSp + value
             end
         end
     end
 
-    unit.atk = atk
-    unit.def = def
-    unit.maxHp = maxHp
+    unit.atk, unit.def = atk, def
+    unit.maxHp, unit.maxSp = maxHp, maxSp
     unit.hp = math.min(unit.hp, unit.maxHp)
+    unit.sp = math.min(unit.sp, unit.maxSp)
 
-    return {
-        atk = atk,
-        def = def,
-        maxHp = maxHp,
-        hp = unit.hp,
-    }
+    return { atk = atk, def = def, maxHp = maxHp, maxSp = maxSp,
+             hp = unit.hp, sp = unit.sp }
 end
 
 return Scene
