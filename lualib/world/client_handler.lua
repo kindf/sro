@@ -73,6 +73,28 @@ local function ReqCaskSkill(player, req)
             maxHp = data.maxHp,
         })
         PlayerManager:GetInstance():SendUidsPacket(data.receivers, packet)
+        -- 2. 技能附带的 Buff
+        for _, buff in ipairs(data.buffs or {}) do
+            local set = buff.receivers
+
+            local buffPacket = ProtocolHelper.EncodePTCPacket("Scene.UnitBuff", {
+                uid = buff.uid,
+                buffId = buff.buffId,
+                duration = buff.duration,
+            })
+            PlayerManager.GetInstance():SendUidsPacket(set, buffPacket)
+
+            local attrPacket = ProtocolHelper.EncodePTCPacket("Scene.UnitAttr", {
+                uid = buff.uid,
+                atk = buff.attr.atk,
+                def = buff.attr.def,
+                maxHp = buff.attr.maxHp,
+                hp = buff.attr.hp,
+                sp = buff.attr.sp,
+                maxSp = buff.attr.maxSp,
+            })
+            PlayerManager.GetInstance():SendUidsPacket(set, attrPacket)
+        end
     end
 
     if data.reward then

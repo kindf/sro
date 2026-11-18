@@ -330,13 +330,44 @@ local target = self.units[req.targetUid]
 
     local ratio = (effect.PVEDamageRadio and effect.PVEDamageRadio[1] or 10000) / 10000
     local static = effect.PVEStaticDam and effect.PVEStaticDam[1] or 0
-    local damage = math.max(1, math.floor(unit.atk * ratio + static - (target.def or 0)))
+
+    local perHit = math.floor(unit.atk * ratio + static - (target.def or 0))
+    if ratio > 0 and perHit < 1 then
+        perHit = 1
+    end
+    if perHit < 0 then
+        perHit = 0
+    end
+
+    local hitCount = effect.AttackCount and effect.AttackCount[1] or 1
+    local totalDamage = 0
+
+    for i = 1, hitCount do
+        if target.hp <= 0 then
+            break
+        end
+        target.hp = math.max(0, target.hp - perHit)
+        totalDamage = totalDamage + perHit
+    end
 
     unit.skillCooldown[req.skillId] = now
-    target.hp = math.max(0, target.hp - damage)
+    target.hp = math.max(0, target.hp - totalDamage)
+
+    local buffs = {}
+
+    for _, entry in ipairs(effect.CreateBuff or {}) do
+        local buffId, rate = entry[1], entry[2] or 0
+        local hit = rate >= 10000 or math.random(10000) <= rate
+        if hit then
+            local buff = self:ApplyBuff(uid, buffId, now)
+            if buff then
+                buffs[#buffs + 1] = buff
+            end
+        end
+    end
 
     if target:IsMonster() then
-        target:AddHatred(uid, damage, now)
+        target:AddHatred(uid, totalDamage, now)
     end
 
     local dead = false
@@ -360,13 +391,14 @@ local target = self.units[req.targetUid]
     return {
         code = SKILL_OK,
         targetUid = target.uid,
-        damage = damage,
+        damage = totalDamage,
         targetHp = target.hp,
         maxHp = target.maxHp,
         receivers = receives,
         dead = dead,
         deadReceivers = dead and receives or {},
         reward = reward,
+        buffs = buffs,
     }
 end
 
