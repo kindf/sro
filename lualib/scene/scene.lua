@@ -82,6 +82,15 @@ function Scene:Ctor(cfg)
     self.dropSeq = 0
 end
 
+function Scene:LoadGrid(grid)
+    self.grid = grid or {
+        cell = 1.0,
+        minX = self.minX, maxX = self.maxX,
+        minZ = self.minZ, maxZ = self.maxZ,
+        blocked = {},
+    }
+end
+
 function Scene:GridKey(gx, gz)
     return gx.."_"..gz
 end
@@ -875,6 +884,116 @@ function Scene:SelectSkillTargets(uid, skill, effect, primaryUid)
                 end
             end
         end
+    end
+end
+
+function Scene:IsBlocked(x, z)
+    local g = self.grid
+    if x < g.minX or x > g.maxX or z < g.minZ or z > g.maxZ then
+        return true
+    end
+
+    for _, r in ipairs(g.blocked or {}) do
+        if x >= r.x1 and x <= r.x2 and z >= r.z1 and z <= r.z2 then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function toCell(scene, x, z)
+    local g = scene.grid
+    return math.floor((x - g.minX) / g.cell),
+           math.floor((z - g.minZ) / g.cell)
+end
+
+local function toWorld(scene, gx, gz)
+    local g = scene.grid
+    return g.minX + (gx + 0.5) * g.cell,
+           g.minZ + (gz + 0.5) * g.cell
+end
+
+local DIRS = {
+    {1, 0}, {-1, 0}, {0, 1}, {0, -1},
+}
+
+function Scene:FindPath(sx, sz, tx, tz, maxSteps)
+    maxSteps = maxSteps or 4000
+
+    local startX, startZ = toCell(self, sx, sz)
+    local goalX, goalZ = toCell(self, tx, tz)
+
+    local function key(x,z) return x .. "," .. z end
+
+    local start = {
+        x = startX,
+        z = startZ,
+        g = 0,
+        h = math.abs(goalX - startX) + math.abs(goalZ - startZ),
+        parent = nil,
+    }
+
+    start.f = start.g + start.h
+
+    local open = {start}
+    local openMap = {[key(startX, startZ)] = start}
+    local closed = {}
+
+    local steps = 0
+    while #open > 0 and steps < maxSteps do
+        steps = steps + 1
+
+        local bestIdx = 1
+        for i = 2, #open do
+            if open[i].f < open[bestIdx].f then
+                bestIdx = i
+            end
+        end
+
+        local cur = table.remove(open, bestIdx)
+        openMap[key(cur.x, cur.z)] = nil
+
+        if cur.x == goalX and cur.z == goalZ then
+            local path = {}
+            local node = cur
+            while node do
+                local wx, wz = toWorld(self, node.x, node.z)
+                table.insert(path, {x = wx, z = wz})
+                node = node.parent
+            end
+            local result = {}
+            for i = #path, 2, -1 do
+                table.insert(result, path[i])
+            end
+            return result
+        end
+
+        closed[key(cur.x, cur.z)] = true
+
+        for _, d in ipairs(DIRS) do
+            local nx, nz = cur.x + d[1], cur.z + d[2]
+            local k = key(nx, nz)
+            if not closed[k] then
+                local wx, wz = toWorld(self, nx, nz)
+                if not self:IsBlocked(wx, wz) then
+                    local g = cur.g + 1
+                    local h = math.abs(goalX - nx) + math.abs(goalZ - nz)
+                    local f = g + h
+                    local node = openMap[k]
+                    if not node then
+                        node = {x = nx, z = nz, g = g, h = h, f = f, parent = cur}
+                        table.insert(open, node)
+                        openMap[k] = node
+                    elseif g < node.g then
+                        node.g = g
+                        node.f = f
+                        node.parent = cur
+                    end
+                end
+            end
+        end
+        return nil
     end
 end
 

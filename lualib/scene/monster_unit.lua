@@ -34,6 +34,11 @@ function MonsterUnit:Ctor(entityId, x, z)
     self.hatred = {} -- uid -> {treat = number, at = now}
     self.leashRange = 15.0 -- 离出生点脱战距离
     self.skillIds = {}
+
+    self.path = nil
+    self.pathIndex = 1
+    self.pathGoalX = nil
+    self.pathGoalZ = nil
 end
 
 function MonsterUnit:Pack()
@@ -185,10 +190,28 @@ end
 ---@param dt number
 ---@param events table
 function MonsterUnit:StepTo(scene, x, z, dt, events)
-    local dx, dz = x - self.x, z - self.z
+    local goalMoved = not self.pathGoalX
+        or math.abs(x - self.pathGoalX) > 2
+        or math.abs(z - self.pathGoalZ) > 2
+
+    if not self.path or goalMoved or self.pathIndex > #self.path then
+        self.path = scene:FindPath(self.x, self.z, x, z)
+        self.pathIndex = 1
+        self.pathGoalX, self.pathGoalZ = x, z
+    end
+
+    local node = self.path and self.path[self.pathIndex]
+    if not node then
+        -- 没有路径：直线兜底
+        return self:StepDirect(scene, x, z, dt, events)
+    end
+
+    local dx, dz = node.x - self.x, node.z - self.z
     local dist = math.sqrt(dx * dx + dz * dz)
-    if dist < 0.01 then
-        return true
+
+    if dist < 0.3 then
+        self.pathIndex = self.pathIndex + 1
+        return false
     end
 
     local step = math.min(self.speed * dt, dist)
@@ -196,19 +219,11 @@ function MonsterUnit:StepTo(scene, x, z, dt, events)
     local nz = self.z + dz / dist * step
 
     local result = scene:Move(self.uid, {
-        common = 0,
-        time = dt,
-        dx = nx,
-        dy = self.y,
-        dz = nz,
+        common = 0, time = dt,
+        dx = nx, dy = self.y, dz = nz,
     })
-
     if result and not result.forced then
-        table.insert(events, {
-            kind = "move",
-            uid = self.uid,
-            result = result,
-        })
+        events[#events + 1] = { kind = "move", uid = self.uid, result = result }
     end
     return dist <= step
 end

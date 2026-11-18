@@ -4,6 +4,7 @@ local Logger = require "common.logger"
 local ConfigRepository = require "common.config_repository"
 local skynet = require "skynet"
 local SceneSpawn = require "lualib.scene.scene_spawn"
+local SceneGrid = require "lualib.scene.scene_grid"
 
 ---@class SceneManager
 ---@field scenes table<integer, Scene>
@@ -36,6 +37,7 @@ function SceneManager:GetScene(sceneId)
 
     scene = Scene.new(cfg)
     self.scenes[sceneId] = scene
+    scene:LoadGrid(SceneGrid[sceneId])
     scene:InitSpawns(SceneSpawn[sceneId] or {})
     return scene
 end
