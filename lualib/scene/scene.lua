@@ -32,6 +32,13 @@ local SKILL_TARGET_DEAD = 5
 local SKILL_NOT_SELF    = 6
 local SKILL_CASTER_DEAD = 7
 
+local ATTR_MAP = {
+    [51] = "atk",
+    [53] = "def",
+    [312] = "atk",
+    [186] = "def",
+}
+
 
 ---@class Scene
 ---@field sceneId number
@@ -622,34 +629,34 @@ end
 
 function Scene:ApplyBuff(uid, buffId, now)
     local unit = self.units[uid]
-    if not unit then
-        return nil
-    end
-
     local def = ConfigRepository.Get("tbbufftable")[buffId]
-    if not def then
+    if not unit or not def then
         return nil
     end
 
     local duration = 3600
-    if def.DestoryTiming and def.DestoryTiming[1] and def.DestoryTiming[1][2] then
-        duration = math.floor(def.DestoryTiming[1][2])
+    if def.DestroyTiming and def.DestroyTiming[1] and def.DestroyTiming[1][2] then
+        duration = math.floor(def.DestroyTiming[1][2])
     end
 
     unit.buffs[buffId] = {
         expireAt = now + duration,
+        attr = self:ParseBuffEffect(buffId),
     }
+
+    local attrs = self:RecalcAttr(unit)
 
     local set = self:GetNeighborSet(unit.gx, unit.gz)
     local receivers = {}
     for id in pairs(set) do
-        table.insert(receivers, id)
+        receivers[#receivers + 1] = id
     end
 
     return {
         uid = uid,
         buffId = buffId,
         duration = duration,
+        attr = attrs,
         receivers = receivers,
     }
 end
@@ -659,19 +666,24 @@ function Scene:UpdateBuffs(now, events)
         for buffId, buff in pairs(unit.buffs or {}) do
             if now >= buff.expireAt then
                 unit.buffs[buffId] = nil
+                local attrs = self:RecalcAttr(unit)
+
                 local set = self:GetNeighborSet(unit.gx, unit.gz)
                 local receivers = {}
                 for id in pairs(set) do
-                    table.insert(receivers, id)
+                    receivers[#receivers + 1] = id
                 end
 
-                table.insert(events, {
-                    kind = "buff",
-                    uid = unit.uid,
-                    buffId = buffId,
-                    duration = 0,
+                events[#events + 1] = {
+                    kind = "buff", uid = unit.uid, buffId = buffId,
+                    duration = 0, receivers = receivers,
+                }
+                events[#events + 1] = {
+                    kind = "attr", uid = unit.uid,
+                    atk = attrs.atk, def = attrs.def,
+                    maxHp = attrs.maxHp, hp = attrs.hp,
                     receivers = receivers,
-                })
+                }
             end
         end
     end
@@ -682,11 +694,11 @@ function Scene:SetAttr(uid, attrs, now)
     if not unit then
         return nil
     end
+    unit.baseAtk = attrs.atk or unit.baseAtk
+    unit.baseDef = attrs.def or unit.baseDef
+    unit.baseMaxHp = attrs.maxHp or unit.baseMaxHp
 
-    unit.atk = attrs.atk or unit.atk
-    unit.def = attrs.def or unit.def
-    unit.maxHp = attrs.maxHp or unit.maxHp
-    unit.hp = math.min(unit.hp, unit.maxHp)
+    local result = self:RecalcAttr(unit)
 
     local set = self:GetNeighborSet(unit.gx, unit.gz)
     local receivers = {}
@@ -696,11 +708,68 @@ function Scene:SetAttr(uid, attrs, now)
 
     return {
         uid = uid,
-        atk = unit.atk,
-        def = unit.def,
-        maxHp = unit.maxHp,
-        hp = unit.hp,
+        atk = result.atk,
+        def = result.def,
+        maxHp = result.maxHp,
+        hp = result.hp,
         receivers = receivers,
+    }
+end
+
+function Scene:ParseBuffEffect(buffId)
+    local def = ConfigRepository.Get("tbbufftable")[buffId]
+    if not def then
+        return {}
+    end
+
+    local attr = {}
+
+    for _, effectId in ipairs(def.EffectGroup or {}) do
+        local effect = ConfigRepository.Get("tbbuffeffecttable")[effectId]
+        if effect and effect.EffectType == 2 then
+            for pair in string.gmatch(effect.EffectParam or "", "([^|]+)") do
+                local k, v = string.match(pair, "^(%d+)=(%-?%d+)$")
+                k, v = tonumber(k), tonumber(v)
+                if k and v then
+                    local field = ATTR_MAP[k]
+                    if field then
+                        attr[field] = (attr[field] or 0) + v
+                    end
+                end
+            end
+        end
+    end
+
+    return attr
+end
+
+function Scene:RecalcAttr(unit)
+    local atk = unit.baseAtk
+    local def = unit.baseDef
+    local maxHp = unit.baseMaxHp
+
+    for _, buff in pairs(unit.buffs or {}) do
+        for field, value in pairs(buff.attr or {}) do
+            if field == "atk" then
+                atk = atk + value
+            elseif field == "def" then
+                def = def + value
+            elseif field == "maxHp" then
+                maxHp = maxHp + value
+            end
+        end
+    end
+
+    unit.atk = atk
+    unit.def = def
+    unit.maxHp = maxHp
+    unit.hp = math.min(unit.hp, unit.maxHp)
+
+    return {
+        atk = atk,
+        def = def,
+        maxHp = maxHp,
+        hp = unit.hp,
     }
 end
 

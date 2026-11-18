@@ -169,12 +169,20 @@ local function ReqUseItem(player, req)
             if buffId then
                 local buff = player:ApplyBuff(buffId)
                 if buff then
+                    local set = buff.receivers
                     local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitBuff", {
-                        uid = player.uid,
-                        buffId = buffId,
-                        duration = buff.duration,
+                        uid = player.uid, buffId = buffId, duration = buff.duration,
                     })
-                    PlayerManager.GetInstance():SendUidsPacket(buff.receivers, packet)
+                    PlayerManager.GetInstance():SendUidsPacket(set, packet)
+
+                    local attr = ProtocolHelper.EncodePTCPacket("Scene.UnitAttr", {
+                        uid = player.uid,
+                        atk = buff.attr.atk,
+                        def = buff.attr.def,
+                        maxHp = buff.attr.maxHp,
+                        hp = buff.attr.hp,
+                    })
+                    PlayerManager.GetInstance():SendUidsPacket(set, attr)
                 end
             end
         else

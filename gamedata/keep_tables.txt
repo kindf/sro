@@ -8,6 +8,7 @@ tbawardtable
 tbawardpacktable
 tbitemfunctiontable
 tbbufftable
+tbbuffeffecttable
 tbequiptable
 tbequippositiontable
 tbattrinfotable

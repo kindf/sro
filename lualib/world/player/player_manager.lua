@@ -170,6 +170,12 @@ function PlayerManager:OnSceneEvent(events)
                 duration = e.duration,
             })
             self:SendUidsPacket(e.receivers, packet)
+        elseif e.kind == "attr" then
+            local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitAttr", {
+                uid = e.uid, atk = e.atk, def = e.def,
+                maxHp = e.maxHp, hp = e.hp,
+            })
+            self:SendUidsPacket(e.receivers, packet)
         end
     end
 end

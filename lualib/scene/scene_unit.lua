@@ -19,6 +19,9 @@ local Logger = require "common.logger"
 ---@field jobExp number
 ---@field level number
 ---@field buffs table
+---@field baseAtk number
+---@field baseDef number
+---@field baseMaxHp number
 ---@field atk number
 ---@field def number
 local SceneUnit = Class("SceneUnit")
@@ -42,6 +45,10 @@ function SceneUnit:Ctor()
     self.jobExp = 0
     self.level = 1
     self.buffs = {}
+
+    self.baseAtk = 10
+    self.baseDef = 0
+    self.baseMaxHp = 1000
     self.atk = 10
     self.def = 0
 end
@@ -71,5 +78,7 @@ function SceneUnit:Pack()
         maxHp = self.maxHp
     }
 end
+
+
 
 return SceneUnit
