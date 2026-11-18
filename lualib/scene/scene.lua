@@ -499,6 +499,7 @@ function Scene:AddMonster(entityId, x, z)
     unit.sight = cfg.Sight
     unit.aiType = cfg.AI[1]
     unit.atk = cfg.BaseATK > 0 and cfg.BaseATK or 10
+    unit.skillIds = cfg.UnitSkillID or {}
 
     self:AddUnit(unit)
     return unit

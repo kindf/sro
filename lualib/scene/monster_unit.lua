@@ -17,6 +17,7 @@ local ATTACK_DAMAGE = 50
 ---@field state string
 ---@field hatred table<number, table>
 ---@field leashRange number
+---@field skillIds table
 local MonsterUnit = Class("MonsterUnit", SceneUnit)
 
 function MonsterUnit:Ctor(entityId, x, z)
@@ -32,6 +33,7 @@ function MonsterUnit:Ctor(entityId, x, z)
     self.state = "idle" -- idle / chase / attack / return
     self.hatred = {} -- uid -> {treat = number, at = now}
     self.leashRange = 15.0 -- 离出生点脱战距离
+    self.skillIds = {}
 end
 
 function MonsterUnit:Pack()
@@ -107,6 +109,11 @@ function MonsterUnit:UpdateAI(scene, now, events)
     end
 
     self.state = "attack"
+    
+    if self:TryCastSkills(scene, target, now, events) then
+        return
+    end
+
     if now < self.nextAttackAt then
         return
     end
@@ -204,6 +211,52 @@ function MonsterUnit:StepTo(scene, x, z, dt, events)
         })
     end
     return dist <= step
+end
+
+function MonsterUnit:TryCastSkills(scene, target, now, events)
+    for _, entry in ipairs(self.skillIds or {}) do
+        local skillId = entry[1]
+        if not skillId then
+            goto continue
+        end
+
+        local result = scene:CastSkill(self.uid, {
+            skillId = skillId,
+            targetUid = target.uid,
+        }, now)
+
+        if result and result.code == 0 then
+            for _, hit in ipairs(result.hits or {}) do
+                table.insert(events, {
+                    kind = "hp",
+                    uid = hit.uid,
+                    hp = hit.hp,
+                    maxHp = hit.maxHp,
+                    receivers = hit.receivers,
+                })
+                if hit.dead then
+                    table.insert(events, {
+                        kind = "dead",
+                        uid = hit.uid,
+                        receivers = hit.deadReceivers,
+                    })
+                end
+            end
+            -- 技能附带的 Buff
+            for _, buff in ipairs(result.buffs or {}) do
+                events[#events + 1] = {
+                    kind = "buff",
+                    uid = buff.uid,
+                    buffId = buff.buffId,
+                    duration = buff.duration,
+                    receivers = buff.receivers,
+                }
+            end
+            return true
+        end
+        ::continue::
+    end
+    return false
 end
 
 return MonsterUnit
