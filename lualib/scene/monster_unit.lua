@@ -218,9 +218,10 @@ function MonsterUnit:StepTo(scene, x, z, dt, events)
     local nx = self.x + dx / dist * step
     local nz = self.z + dz / dist * step
 
+    local node = self.path[self.pathIndex]
     local result = scene:Move(self.uid, {
         common = 0, time = dt,
-        dx = nx, dy = self.y, dz = nz,
+        dx = nx, dy = node.h or self.y, dz = nz,
     })
     if result and not result.forced then
         events[#events + 1] = { kind = "move", uid = self.uid, result = result }

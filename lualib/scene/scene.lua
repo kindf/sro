@@ -20,6 +20,8 @@ local DEFAULT_MIN_Z = -10000-- 默认地图尺寸
 local MONSTER_UID_BASE = 1000000 -- 怪物uid偏移
 local DROP_UID_BASE = 2000000 -- 掉落物id偏移
 
+local HEIGHT_LEGAL_DIFF = 0.4
+
 local SKILL_RANGE       = 10.0
 local SKILL_COOLDOWN    = 0.5
 local SKILL_DAMAGE      = 100
@@ -215,6 +217,15 @@ function Scene:Move(uid, moveContent)
         return _ForcedBack(unit)
     end
 
+    local h = self:GetHeight(dx, dz)
+    if not h then
+        return _ForcedBack(unit)
+    end
+
+    if math.abs(h - unit.y) > HEIGHT_LEGAL_DIFF then
+        return _ForcedBack(unit)
+    end
+
     time = math.max(0, math.min(2, time))
 
     local now = os.time()
@@ -253,7 +264,7 @@ function Scene:Move(uid, moveContent)
     end
 
     local common = moveContent.common
-    unit.x, unit.y, unit.z = dx, dy, dz
+    unit.x, unit.y, unit.z = dx, h, dz
     unit.lastMoveAt = now
     unit.token = unit.token - cost
     unit.face = common & 0xFFFF
@@ -926,11 +937,16 @@ function Scene:FindPath(sx, sz, tx, tz, maxSteps)
 
     local function key(x,z) return x .. "," .. z end
 
+    local h0 = self:GetHeight(sx, sz)
+    if not h0 then
+        return nil
+    end
+
     local start = {
         x = startX,
         z = startZ,
         g = 0,
-        h = math.abs(goalX - startX) + math.abs(goalZ - startZ),
+        h = h0,
         parent = nil,
     }
 
@@ -976,9 +992,10 @@ function Scene:FindPath(sx, sz, tx, tz, maxSteps)
             local k = key(nx, nz)
             if not closed[k] then
                 local wx, wz = toWorld(self, nx, nz)
-                if not self:IsBlocked(wx, wz) then
+                local nh = self:GetHeight(wx, wz)
+                if nh and not self:IsBlocked(wx, wz) and math.abs(nh - cur.h) <= HEIGHT_LEGAL_DIFF then
                     local g = cur.g + 1
-                    local h = math.abs(goalX - nx) + math.abs(goalZ - nz)
+                    local h = nh
                     local f = g + h
                     local node = openMap[k]
                     if not node then
@@ -995,6 +1012,41 @@ function Scene:FindPath(sx, sz, tx, tz, maxSteps)
         end
         return nil
     end
+end
+
+function Scene:GetHeight(x, z)
+    local g = self.grid
+    if not g then
+        return nil
+    end
+
+    local gx = math.floor((x - g.minX) / g.cell)
+    local gz = math.floor((z - g.minZ) / g.cell)
+
+    if gx < 0 or gx >= g.width or gz < 0 or gz >= g.height then
+        return nil
+    end
+
+    local v = g.cells[gz * g.width + gx + 1]
+    if not v or v == -100 or v == 0 then
+        return nil
+    end
+
+    return v / 100.0
+end
+
+function Scene:CanWalk(fromX, fromZ, toX, toZ)
+    if self:IsBlocked(toX, toZ) then
+        return false
+    end
+
+    local h1 = self:GetHeight(fromX, fromZ)
+    local h2 = self:GetHeight(toX, toZ)
+    if not h1 or not h2 then
+        return false
+    end
+
+    return math.abs(h2 - h1) <= HEIGHT_LEGAL_DIFF
 end
 
 return Scene
