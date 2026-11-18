@@ -348,44 +348,48 @@ function Scene:CastSkill(uid, req, now)
 end
 
 function Scene:GiveReward(player, monster)
-    local cfg = ConfigRepository.Get("tbentityable")[monster.entityId]
+    local cfg = ConfigRepository.Get("tbentitytable")[monster.entityId]
     if not cfg then
         return nil
     end
 
-    local baseExp = cfg.BaseExp or 0
-    local jobExp = cfg.JobExp or 0
+    local reward = {
+        baseExp = cfg.BaseExp or 0,
+        jobExp = cfg.JobExp or 0,
+        totalBaseExp = 0,
+        totalJobExp = 0,
+        level = player.level,
+        drops = {},
+    }
 
-    player.baseExp = player.baseExp + baseExp
-    player.jobExp = player.jobExp + jobExp
+    player.baseExp = player.baseExp + reward.baseExp
+    player.jobExp = player.jobExp + reward.jobExp
+    reward.totalBaseExp = player.baseExp
+    reward.totalJobExp = player.jobExp
 
-    local drops = {}
-    for _, itemId in ipairs(cfg.Award or {}) do
-        local drop = self:DropItem(itemId, 1, monster.x, monster.z)
-        table.insert(drops, drop:Pack())
+    -- Award：awardId -> pack -> item
+    for _, awardId in ipairs(cfg.Award or {}) do
+        local items = self:RollAward(awardId)
+        for _, item in ipairs(items) do
+            local drop = self:DropItem(item.itemId, item.count, monster.x, monster.z)
+            reward.drops[#reward.drops + 1] = drop:Pack()
+        end
     end
 
+    -- DropDoodad：直接 {itemId, count}
     for _, d in ipairs(cfg.DropDoodad or {}) do
-        local itemId, count = d[1], d[2] or 1
-        local drop = self:DropItem(itemId, count, monster.x, monster.z)
-        table.insert(drops, drop:Pack())
+        local drop = self:DropItem(d[1], d[2] or 1, monster.x, monster.z)
+        reward.drops[#reward.drops + 1] = drop:Pack()
     end
 
     local set = self:GetNeighborSet(monster.gx, monster.gz)
     local receivers = {}
     for id in pairs(set) do
-        table.insert(receivers, id)
+        receivers[#receivers + 1] = id
     end
-    
-    return {
-        baseExp = baseExp,
-        jobExp = jobExp,
-        totalBaseExp = player.baseExp,
-        totalJobExp = player.jobExp,
-        level = player.level,
-        drops = drops,
-        dropReceivers = receivers,
-    }
+    reward.dropReceivers = receivers
+
+    return reward
 end
 
 function Scene:AddUnit(unit)
@@ -577,6 +581,40 @@ function Scene:DropItemAt(uid, itemId, count)
         table.insert(receivers, id)
     end
     return {unit = drop:Pack(), receivers = receivers}
+end
+
+function Scene:RollAward(awardId)
+    local award = ConfigRepository.Get("tbawardtable")[awardId]
+    local AwardPackTable = ConfigRepository.Get("tbawardpacktable")
+    if not award then
+        return {}
+    end
+
+    local result = {}
+
+    for i, packId in ipairs(award.PackIds or {}) do
+        local rate = award.PackRates and award.PackRates[i] or 0
+        if rate > 0 and (rate >= 1 or math.random() < rate) then
+            local pack = AwardPackTable[packId]
+            local content = pack and pack.GroupContent and pack.GroupContent[1]
+            if content then
+                local itemId = content[1]
+                local count = 1
+
+                -- NumberInfo = {min, max}，今天先取 max 或 1
+                if pack.NumberInfo and pack.NumberInfo[2] and pack.NumberInfo[2] > 0 then
+                    count = pack.NumberInfo[2]
+                end
+
+                result[#result + 1] = {
+                    itemId = itemId,
+                    count = count,
+                }
+            end
+        end
+    end
+
+    return result 
 end
 
 return Scene

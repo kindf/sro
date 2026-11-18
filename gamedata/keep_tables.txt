@@ -4,3 +4,5 @@
 tbscenetable
 tbentitytable
 tbitemtable
+tbawardtable
+tbawardpacktable
