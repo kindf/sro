@@ -4,6 +4,7 @@ local ServiceHelper = require "common.service_helper"
 require "skynet.manager" -- import skynet.abort
 require "skynet.queue"
 require "world.client_handler"
+require "world.player.player"
 
 package.path = package.path .. ';./lualib/world/?.lua'
 

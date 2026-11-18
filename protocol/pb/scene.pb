@@ -1,6 +1,5 @@
 
-½
-
+£
 scene.protoScene"e
 ReqMove
 common (Rcommon
@@ -64,6 +63,32 @@ RespRevive
 	targetUid (R	targetUid"N
 
 RespPickup
+code (Rcode
+itemId (RitemId
+count (Rcount"L
+ItemInfo
+slot (Rslot
+itemId (RitemId
+count (Rcount"2
+	RespItems%
+items (2.Scene.ItemInfoRitems"N
+
+ItemUpdate
+slot (Rslot
+itemId (RitemId
+count (Rcount"6
+
+ReqUseItem
+slot (Rslot
+count (Rcount"O
+RespUseItem
+code (Rcode
+itemId (RitemId
+count (Rcount"7
+ReqDropItem
+slot (Rslot
+count (Rcount"P
+RespDropItem
 code (Rcode
 itemId (RitemId
 count (Rcount"$

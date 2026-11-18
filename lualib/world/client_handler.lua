@@ -1,7 +1,6 @@
 local Logger = require "common.logger"
 local ProtocolHelper = require "protocol.protocol_helper"
 local PlayerManager = require "world.player.player_manager"
-local WorldHandler = require "world.world_service_handler"
 
 ---@param player Player
 local function ReqMove(player, req)
@@ -129,10 +128,62 @@ local function ReqPickup(player, req)
     }))
 
     if data.code == 0 then
-        local leave = ProtocolHelper.EncodePTCPacket("Scene.UnitLeave", {
-            uid = req.targetUid,
-        })
-        PlayerManager.GetInstance():SendUidsPacket(data.receivers, leave)
+        local changed, err = player:AddItem(data.itemId, data.count)
+        if not changed then
+            player:DropItemToScene(data.itemId, data.count)
+            player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.RespPickup", {
+                code = 3,
+                itemId = 0,
+                count = 0
+            }))
+            return
+        end
+        player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.RespPickup", {
+            code = 0, itemId = data.itemId, count = data.count
+        }))
+        player:SendItemUpdate(changed)
     end
 end
 ProtocolHelper.RegisterPTCHandler("Scene.ReqPickup", ReqPickup)
+
+---@param player Player
+local function ReqUseItem(player, req)
+    local data = player:UseItem(req.slot, req.count)
+    if not data then
+        return
+    end
+
+    player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.RespUseItem", {
+        code = data.code,
+        itemId = data.itemId or 0,
+        count = data.count or 0,
+    }))
+
+    if data.code == 0 then
+        player:SendItems()
+    end
+end
+ProtocolHelper.RegisterPTCHandler("Scene.ReqUseItem", ReqUseItem)
+
+---@param player Player
+local function ReqDropItem(player, req)
+    local itemId, count = player:RemoveItem(req.slot, req.count)
+    if not itemId then
+        player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.RespDropItem", {
+            code = 1, itemId = 0, count = 0,
+        }))
+        return
+    end
+
+    local data = player:DropItemToScene(itemId, count)
+    player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.RespDropItem", {
+        code = 0, itemId = itemId, count = count,
+    }))
+    player:SendItems()
+    
+    if data and data.unit then
+        local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitEnter", data.unit)
+        PlayerManager.GetInstance():SendUidsPacket(data.receivers, packet)
+    end
+end
+ProtocolHelper.RegisterPTCHandler("Scene.ReqDropItem", ReqDropItem)

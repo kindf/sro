@@ -3,3 +3,4 @@
 # 然后跑：python sro/tools/table/prune_generated.py
 tbscenetable
 tbentitytable
+tbitemtable

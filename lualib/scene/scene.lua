@@ -564,4 +564,19 @@ function Scene:Pickup(uid, targetUid)
     }
 end
 
+function Scene:DropItemAt(uid, itemId, count)
+    local player = self.units[uid]
+    if not player then
+        return nil
+    end
+
+    local drop = self:DropItem(itemId, count, player.x, player.z)
+    local set = self:GetNeighborSet(drop.gx, drop.gz)
+    local receivers = {}
+    for id in pairs(set) do
+        table.insert(receivers, id)
+    end
+    return {unit = drop:Pack(), receivers = receivers}
+end
+
 return Scene

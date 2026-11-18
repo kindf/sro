@@ -89,6 +89,44 @@ message RespPickup {
     required int32 count = 3;
 }
 
+message ItemInfo {
+    required uint32 slot = 1;
+    required uint32 itemId = 2;
+    required int32 count = 3;
+}
+
+message RespItems {
+    repeated ItemInfo items = 1;
+}
+
+message ItemUpdate {
+    required uint32 slot = 1;
+    required uint32 itemId = 2;
+    required int32 count = 3;
+}
+
+message ReqUseItem {
+    required uint32 slot = 1;
+    required int32 count = 2;
+}
+
+message RespUseItem {
+    required int32 code = 1;
+    required uint32 itemId = 2;
+    required int32 count = 3;
+}
+
+message ReqDropItem {
+    required uint32 slot = 1;
+    required int32 count = 2;
+}
+
+message RespDropItem {
+    required int32 code = 1;
+    required uint32 itemId = 2;
+    required int32 count = 3;
+}
+
 message ReqEnter {
     required uint32 sceneId = 1;
 }
