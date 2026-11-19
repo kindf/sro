@@ -5,6 +5,7 @@ local MonsterUnit = require "lualib.scene.monster_unit"
 local ConfigRepository = require "common.config_repository"
 local DropUnit = require("lualib.scene.drop_unit")
 local skynet = require "skynet"
+local MapLayerParser = require "lualib.scene.map_layer_parser"
 
 local MAX_SPEED       = 6.0   -- 占位，后面从属性表取
 local SPEED_TOLERANCE = 2.0   -- 允许 2 倍速度
@@ -59,6 +60,7 @@ end
 ---@field spawns table
 ---@field monsterSeq number
 ---@field dropSeq number
+---@field heightLayers table
 local Scene = Class("Scene")
 
 function Scene:Ctor(cfg)
@@ -83,6 +85,8 @@ function Scene:Ctor(cfg)
     self.spawns = {}
     self.monsterSeq = 0
     self.dropSeq = 0
+
+    self.heightLayers = {}
 end
 
 function Scene:LoadGrid(grid)
@@ -1025,31 +1029,6 @@ function Scene:FindPath(sx, sz, tx, tz, maxSteps)
     return nil
 end
 
--- 高度表以厘米为单位；只有障碍矩形的旧地图使用出生点的平面高度。
-function Scene:GetHeight(x, z)
-    local g = self.grid
-    if not g or x < g.minX or x > g.maxX or z < g.minZ or z > g.maxZ then
-        return nil
-    end
-    if not g.cells then
-        return self.startPos[2] or 0
-    end
-
-    local gx = math.floor((x - g.minX) / g.cell)
-    local gz = math.floor((z - g.minZ) / g.cell)
-
-    if gx < 0 or gx >= g.width or gz < 0 or gz >= g.height then
-        return nil
-    end
-
-    local v = g.cells[gz * g.width + gx + 1]
-    if not v or v == -100 or v == 0 then
-        return nil
-    end
-
-    return v / 100.0
-end
-
 -- 返回线段在单轴投影内的参数区间，用于判定整段是否与障碍矩形相交。
 local function axisInterval(start, delta, low, high)
     if delta == 0 then
@@ -1098,6 +1077,66 @@ function Scene:CanWalk(fromX, fromZ, toX, toZ)
         end
     end
     return true, targetHeight
+end
+
+function Scene:LoadHeightLayers(baseName)
+    local dir = "./../config/Asserts/Resources/MlyDatas/"
+    for layer = 0, 3 do
+        local path = dir .. baseName .. "-" .. layer .. ".mly"
+        local g = MapLayerParser.Parse(path, layer)
+        if g then
+            self.heightLayers[layer] = g
+        end
+    end
+end
+
+-- 从厘米高度格取地面高度。空洞和格网外的位置不可行走。
+local function sampleHeight(g, x, z)
+    local gx = math.floor((x - g.minX) / g.cell)
+    local gz = math.floor((z - g.minZ) / g.cell)
+    if gx < 0 or gx >= g.width or gz < 0 or gz >= g.height then
+        return nil
+    end
+    local v = g.cells[gz * g.width + gx + 1]
+    if v and v ~= -100 and v ~= 0 then
+        return v / 100.0
+    end
+end
+
+function Scene:GetHeights(x, z)
+    local result = {}
+    for layer, g in pairs(self.heightLayers or {}) do
+        result[layer] = sampleHeight(g, x, z)
+    end
+    return result
+end
+
+-- 有分层地形时沿用层选择；旧地图使用自身高度格或出生点的平面高度。
+function Scene:GetHeight(x, z, preferY)
+    if not next(self.heightLayers) then
+        local g = self.grid
+        if not g or x < g.minX or x > g.maxX or z < g.minZ or z > g.maxZ then
+            return nil
+        end
+        if g.cells then
+            return sampleHeight(g, x, z)
+        end
+        return self.startPos[2] or 0
+    end
+    local hs = self:GetHeights(x, z)
+    if not hs[0] then
+        return nil
+    end
+
+    preferY = preferY or hs[0]
+    local best, bestDiff
+    for _, h in pairs(hs) do
+        local d = math.abs(h - preferY)
+        if not bestDiff or d < bestDiff then
+            best, bestDiff = h, d
+        end
+    end
+    return best
 end
 
 return Scene

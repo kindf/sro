@@ -74,6 +74,16 @@ assert(#adjacent == 1 and adjacent[1].x == 1.5)
 local sameCell = terrain:FindPath(0.5, 1.5, 0.8, 1.5)
 assert(#sameCell == 1 and sameCell[1].x == 0.8)
 
+-- 分层数据一旦存在，底层空洞不可被普通平面填平。
+local bridge = Scene.new({ID = 778, StartPos = {{0.5, 7, 0.5}}})
+bridge:LoadGrid({minX = 0, maxX = 2, minZ = 0, maxZ = 1, cell = 1})
+assert(bridge:GetHeight(0.5, 0.5) == 7 and bridge:GetHeight(-1, 0.5) == nil)
+bridge.heightLayers[0] = {width = 2, height = 1, minX = 0, minZ = 0, cell = 1, cells = {100, -100}}
+bridge.heightLayers[1] = {width = 2, height = 1, minX = 0, minZ = 0, cell = 1, cells = {300, 300}}
+assert(bridge:GetHeight(0.5, 0.5) == 1)
+assert(bridge:GetHeight(0.5, 0.5, 2.9) == 3)
+assert(bridge:GetHeight(1.5, 0.5) == nil)
+
 -- 一张地图临时报错时，其他地图仍发送事件；下一帧会重试失败的地图。
 local isolated = Manager.new()
 local failedTicks, healthyTicks, sent = 0, 0, {}
