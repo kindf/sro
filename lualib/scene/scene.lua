@@ -9,6 +9,8 @@ local MapLayerParser = require "lualib.scene.map_layer_parser"
 local SkillConfig = require "common.skill_config"
 local AttributeComponent = require "scene.attribute_component"
 local SkillComponent = require "scene.skill_component"
+local FightGroupComponent = require "scene.fight_group_component"
+
 
 local MAX_SPEED       = 6.0   -- 占位，后面从属性表取
 local SPEED_TOLERANCE = 2.0   -- 允许 2 倍速度
@@ -151,6 +153,7 @@ function Scene:Enter(uid, x, y, z, attrs)
     end
     local unit = SceneUnit.new()
     unit:AttachComponent(AttributeComponent, 10, 0)
+    unit:AttachComponent(FightGroupComponent)
     unit:AttachComponent(SkillComponent)
 
     unit.uid = uid
@@ -562,6 +565,7 @@ function Scene:AddMonster(entityId, x, z)
     unit.aiType = cfg.AI[1]
     local attack = cfg.BaseATK > 0 and cfg.BaseATK or 10
     unit:AttachComponent(AttributeComponent, attack, cfg.BaseDEF)
+    unit:AttachComponent(FightGroupComponent, cfg)
     unit:AttachComponent(SkillComponent)
     unit.skillIds = cfg.UnitSkillID or {}
 
@@ -902,6 +906,11 @@ function Scene:SelectSkillTargets(uid, skill, effect, primaryUid)
     local caster = self.units[uid]
     local primary = self.units[primaryUid]
     if not caster or not primary or primary.dead or not (primary:IsMonster() or primary:IsPlayer()) then
+        return nil
+    end
+
+    local skills = caster:GetComponent(SkillComponent)
+    if not skills or not skills:CanSelectPrimary(skill, primary) then
         return nil
     end
 
