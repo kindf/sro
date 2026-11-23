@@ -8,6 +8,9 @@ function PlayerLoader.LoadPlayer(fd, addr)
     player.account = addr
     player.uid = Guid
     Guid = Guid + 1
+
+    --- 赋予技能 1 普攻
+    assert(player:LearnSkill(1), "missing starting skill definition: 1")
     return player
 end
 

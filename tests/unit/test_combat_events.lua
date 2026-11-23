@@ -4,7 +4,9 @@ package.path = "./lualib/?.lua;" .. package.path
 package.loaded["skynet"] = {now = function() return 0 end}
 package.loaded["skynet.socket"] = {}
 package.loaded["pb"] = {}
-package.loaded["common.logger"] = {}
+package.loaded["common.logger"] = {
+    Warning = function() end,
+}
 package.loaded["common.config_repository"] = {
     Get = function(name) return require("gamedata.generated." .. name) end,
 }
@@ -20,9 +22,111 @@ package.loaded["protocol.protocol_helper"] = {
 }
 
 local Scene = require "scene.scene"
+local combatAttributes = require "tests.support.combat_attributes"
 local PlayerManager = require "world.player.player_manager"
 local world = require("world.world_service_handler").CMD
 require "world.client_handler"
+
+local function prepareBasicAttack()
+    local scene = Scene.new({ID = 1, StartPos = {{0, 0, 0}}})
+    scene:LoadGrid(nil)
+
+    local playerUid = 1
+    local x, y, z = 0, 0, 0
+    scene:Enter(playerUid, x, y, z)
+    local caster = assert(scene:GetUnit(playerUid), "施法者未进入场景")
+    local monster = assert(scene:AddMonster(1001, x, z), "无法从模板 1001 创建波利")
+
+    assert(combatAttributes(caster).atk == 10 and caster.skillCooldown[1] == nil, "玩家首击输入不符")
+    assert(monster.entityId == 1001 and monster.hp == 21 and monster.maxHp == 21
+        and combatAttributes(monster).def == 0, "波利模板、初始 HP 或防御不符")
+    assert(caster.x == monster.x and caster.y == monster.y and caster.z == monster.z,
+        "玩家与目标应在同一点")
+
+    return {
+        scene = scene,
+        caster = caster,
+        monster = monster,
+        request = {skillId = 1, skillLevel = 1, targetUid = monster.uid},
+        now = 0,
+    }
+end
+
+do
+    -- 对一份刚准备好的输入只施放一次，分别检查返回的命中与持有 HP 的目标对象。
+    local function verifyFirstHit(sample)
+        local result = sample.scene:CastSkill(sample.caster.uid, sample.request, sample.now)
+        assert(result.code == 0, "首次普攻未成功，结果码 " .. tostring(result.code))
+        assert(#result.hits == 1, "单体普攻应命中一个目标")
+        local hit = result.hits[1]
+        assert(hit.uid == sample.monster.uid, "请求命中的不是这次创建的波利")
+        assert(hit.damage == 10 and hit.hp == 11 and sample.monster.hp == 11,
+            "首击应造成 10 点伤害，命中记录和场景目标都应为 11 HP")
+    end
+
+    local runA = prepareBasicAttack()
+    local runB = prepareBasicAttack()
+    assert(runA.scene ~= runB.scene and runA.caster ~= runB.caster
+        and runA.monster ~= runB.monster, "两份样本应各自创建场景和单位")
+
+    verifyFirstHit(runA)
+    assert(runB.monster.hp == 21, "打 A 时改变了 B 的初始 HP")
+    assert(runB.caster.skillCooldown[1] == nil, "打 A 时改变了 B 玩家的冷却")
+
+    verifyFirstHit(runB)
+    assert(runA.monster.hp == 11, "打 B 时又改变了 A 的 HP")
+    print(("OK independent first hits (A=%d, B=%d)"):format(runA.monster.hp, runB.monster.hp))
+end
+
+-- 为一份普攻样本保存经过的 tick。每次调用先推进指定步数，再用换算后的秒数施法。
+local function makeTimedCast(sample)
+    local startSeconds = sample.now
+    local elapsedTicks = 0
+
+    return function(deltaTicks)
+        assert(math.type(deltaTicks) == "integer" and deltaTicks >= 0,
+            "请传入非负整数 tick")
+        elapsedTicks = elapsedTicks + deltaTicks
+        local now = startSeconds + elapsedTicks / 100
+        local result = sample.scene:CastSkill(sample.caster.uid, sample.request, now)
+        return result, now
+    end
+end
+
+do
+    local sample = prepareBasicAttack()
+    local castAfterTicks = makeTimedCast(sample)
+
+    -- 用返回码、场景 HP 和上次成功时间共同判定该次请求的结果。
+    local function checkCast(deltaTicks, expectedCode, expectedHp, expectedLastCast)
+        local result, now = castAfterTicks(deltaTicks)
+        local label = ("t=%.2fs"):format(now)
+        local hp = sample.monster.hp
+        assert(result.code == expectedCode,
+            ("%s 预期结果码 %d，实际 %d"):format(label, expectedCode, result.code))
+        assert(hp == expectedHp,
+            ("%s 预期目标 HP %d，实际 %d"):format(label, expectedHp, hp))
+        assert(sample.caster.skillCooldown[1] == expectedLastCast,
+            label .. " 上次成功施法时间不符合预期")
+
+        if expectedCode == 0 then
+            assert(#result.hits == 1, label .. " 成功普攻应有一个命中")
+            local hit = result.hits[1]
+            assert(hit.uid == sample.monster.uid and hit.damage == 10 and hit.hp == hp,
+                label .. " 命中目标、伤害或剩余 HP 错误")
+        else
+            assert(result.damage == 0 and (result.hits == nil or #result.hits == 0),
+                label .. " 冷却期间不应产生伤害或命中")
+        end
+        print(("%s code=%d hp=%d"):format(label, result.code, hp))
+    end
+
+    -- 参数依次为：从上次请求起推进的 tick、结果码、剩余 HP、上次成功施法的秒数。
+    checkCast(0,  0, 11, 0)
+    checkCast(0,  4, 11, 0)
+    checkCast(99, 4, 11, 0)
+    checkCast(1,  0,  1, 1)
+end
 
 local scene = Scene.new({ID = 1, StartPos = {{0,0,0}}})
 scene:LoadGrid(nil)
@@ -48,12 +152,136 @@ local function received(player, name)
     return found
 end
 
+do
+    local loader = require "world.player.player_loader"
+    local scenes = require("scene.scene_manager").GetInstance()
+    local commands = require("scene.scene_service_handler").CMD
+    local skynet = require "skynet"
+    local previousCall = skynet.call
+    local castCalls = 0
+    skynet.call = function(address, protocol, command, ...)
+        assert(address == ".scene" and protocol == "lua")
+        if command == "cast_skill" then castCalls = castCalls + 1 end
+        return true, commands[command](...)
+    end
+
+    local arena = Scene.new({ID = 1, StartPos = {{0, 0, 0}}})
+    arena:LoadGrid(nil)
+    local function enter(fd)
+        local role = loader.LoadPlayer(fd, tostring(fd))
+        role.packets = {}
+        function role:SendPackage(packet) table.insert(self.packets, packet) end
+        assert(not manager.playersUidMap[role.uid], "两组用例复用了在线 UID " .. role.uid)
+        manager:AddPlayer(role.uid, role)
+        arena:Enter(role.uid, 0, 0, 0)
+        scenes:SetPlayerScene(role.uid, arena)
+        return role
+    end
+    local a, b = enter(501), enter(502)
+    local target = assert(arena:AddMonster(1001, 0, 0))
+    local function castAtTarget(role, skillId)
+        local before = #received(role, "Scene.RespCastSkill")
+        handlers["Scene.ReqCastSkill"](role, {skillId = skillId, targetUid = target.uid})
+        local replies = received(role, "Scene.RespCastSkill")
+        assert(#replies == before + 1, "每个请求应收到一份施法回复")
+        return replies[#replies]
+    end
+
+    local caster = arena:GetUnit(a.uid)
+    local denied = castAtTarget(a, 5)
+    assert(denied.code == 9 and denied.targetUid == target.uid and denied.damage == 0
+        and denied.targetHp == 0 and #denied.hits == 0, "未学冰箭术应明确拒绝")
+    assert(not a:LearnSkill(87654321) and castAtTarget(a, 87654321).code == 9)
+    a.learnedSkillLevels[5] = 0  -- 模拟原版的零级候选技能
+    assert(castAtTarget(a, 5).code == 9, "零级也应拒绝")
+    assert(castCalls == 0 and caster.sp == 100 and target.hp == 21)
+    assert(next(caster.skillCooldown) == nil and next(caster.skillGroupReadyAtMs) == nil)
+    assert(next(target.hatred) == nil and #b.packets == 0, "拒绝不能产生仇恨或旁观广播")
+
+    assert(a:LearnSkill(5) and a:LearnSkill(5) and a.learnedSkillLevels[5] == 1)
+    assert(castAtTarget(b, 5).code == 9 and castCalls == 0, "B 不能借用 A 的冰箭术")
+    caster.dead = true
+    assert(a:Revive() and arena:GetUnit(a.uid) ~= caster, "复活应重建场景单位")
+    local allowed = castAtTarget(a, 5)
+    assert(allowed.code == 0 and #allowed.hits == 1 and allowed.damage == 10)
+    assert(castCalls == 1 and arena:GetUnit(a.uid).sp == 85 and target.hp == 11)
+    local updates = received(b, "Scene.UnitHp")
+    assert(#updates == 1 and updates[1].uid == target.uid and updates[1].hp == 11)
+    assert(castAtTarget(b, 1).code == 0 and target.hp == 1, "B 的出生普攻应可用")
+
+    for _, role in ipairs({a, b}) do
+        scenes:LeaveScene(role.uid)
+        manager:RemovePlayer(role.uid)
+    end
+    do
+        local ambush = 500012
+        local function replay(fd, rank, damage, hp, sp)
+            local role = enter(fd)
+            local caster = arena:GetUnit(role.uid)
+            local target = assert(arena:AddMonster(1001, 0, 0))
+            assert(combatAttributes(caster).atk == 10 and caster.sp == 100
+                and target.hp == 21 and combatAttributes(target).def == 0)
+            assert(role:LearnSkill(ambush) and role:LearnSkill(ambush, rank))
+            assert(role:LearnSkill(ambush))  -- 再次授予一级应保留当前等级
+
+            -- 直接给处理器多塞一个与实学相反的值，核对 world 只信角色记录。
+            handlers["Scene.ReqCastSkill"](role, {
+                skillId = ambush, targetUid = target.uid, skillLevel = 3 - rank,
+            })
+            local replies = received(role, "Scene.RespCastSkill")
+            assert(#replies == 1 and replies[1].code == 0 and #replies[1].hits == 1)
+            local hit = replies[1].hits[1]
+            assert(hit.uid == target.uid and hit.damage == damage and hit.hp == hp
+                and target.hp == hp and caster.sp == sp,
+                ("伏击 Lv%d 实得伤害 %d，目标 HP %d，角色 SP %d")
+                    :format(rank, hit.damage, target.hp, caster.sp))
+
+            if rank == 2 then
+                assert(not role:LearnSkill(ambush, 11) and role.learnedSkillLevels[ambush] == 2)
+                assert(not role:LearnSkill(5, 2), "单级冰箭术没有第二个效果槽")
+                local invalid = arena:CastSkill(role.uid, {
+                    skillId = ambush, skillLevel = 11, targetUid = target.uid,
+                }, 2)
+                assert(invalid.code == 9 and target.hp == hp and caster.sp == sp)
+                assert(caster.skillCooldown[ambush] == 0 and caster.skillGroupReadyAtMs[1] == 2000)
+
+                -- 模板 9010 的首选技能 200004 是五级，怪物也要带对等级。
+                local mob = assert(arena:AddMonster(9010, 0, 0))
+                local beforeHp = caster.hp
+                assert(mob:TryCastSkills(arena, caster, 2, {}))
+                assert(mob.skillCooldown[200004] == 2 and mob.sp == 90 and caster.hp == beforeHp - 122)
+                arena:Leave(mob.uid)
+            end
+            arena:Leave(target.uid)
+            scenes:LeaveScene(role.uid)
+            manager:RemovePlayer(role.uid)
+        end
+
+        replay(601, 1, 16, 5, 88)
+        replay(602, 2, 17, 4, 86)
+        local config = require "common.skill_config"
+        local skills = require("common.config_repository").Get("tbskilltable")
+        assert(config.GetEffectId(skills[ambush], 1) == 50001201)
+        assert(config.GetEffectId(skills[ambush], 2) == 50001202)
+        assert(config.GetEffectId(skills[ambush], 0) == nil)
+        assert(config.GetEffectId(skills[10004], 1) == config.GetEffectId(skills[10004], 2)
+            and config.GetEffectId(skills[10004], 2) == 1000403)
+        print("OK ambush levels: Lv1 damage=16 HP=5 SP=88; Lv2 damage=17 HP=4 SP=86")
+    end
+    skynet.call = previousCall
+    print("OK learned skills: denied before learning, allowed after learning")
+end
+
 local player, observer, newcomer = connect(1), connect(2), connect(3)
 local first = assert(scene:AddMonster(1001, 0, 0))
 local second = assert(scene:AddMonster(1002, 0, 0))
 local now = 0
 function player:CastSkill(req)
-    return scene:CastSkill(self.uid, req, now)
+    return scene:CastSkill(self.uid, {
+        skillId = req.skillId,
+        skillLevel = 1,
+        targetUid = req.targetUid,
+    }, now)
 end
 local cast = handlers["Scene.ReqCastSkill"]
 cast(player, {skillId = 1, targetUid = first.uid})
@@ -86,7 +314,21 @@ local hp = received(observer, "Scene.UnitHp")
 assert(hp[#hp].uid == target.uid and hp[#hp].hp == target.hp)
 
 -- 真实配置技能 3 附加 Buff，到期后的移除和重算应按次序送给同一批邻居。
-cast(player, {skillId = 3, targetUid = player.uid})
+local caster = scene:GetUnit(player.uid)
+local endure = {skillId = 3, targetUid = player.uid}
+for _, attemptTime in ipairs({1, 2.99}) do
+    now = attemptTime
+    cast(player, endure)
+    local replies = received(player, "Scene.RespCastSkill")
+    assert(replies[#replies].code == 4, "怒爆触发的组冷却应拦住霸体")
+    assert(caster.sp == 80 and caster.buffs[10201] == nil, "冷却期间不应扣 SP 或附加霸体")
+end
+
+now = 3
+cast(player, endure)
+local replies = received(player, "Scene.RespCastSkill")
+assert(replies[#replies].code == 0 and caster.sp == 65, "组冷却到期后霸体应成功并扣 15 SP")
+
 local active = scene:GetUnit(player.uid).buffs[10201]
 assert(active and active.expireAt > now)
 local expire = {}

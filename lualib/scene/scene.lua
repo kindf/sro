@@ -6,6 +6,9 @@ local ConfigRepository = require "common.config_repository"
 local DropUnit = require("lualib.scene.drop_unit")
 local skynet = require "skynet"
 local MapLayerParser = require "lualib.scene.map_layer_parser"
+local SkillConfig = require "common.skill_config"
+local AttributeComponent = require "scene.attribute_component"
+local SkillComponent = require "scene.skill_component"
 
 local MAX_SPEED       = 6.0   -- 占位，后面从属性表取
 local SPEED_TOLERANCE = 2.0   -- 允许 2 倍速度
@@ -39,10 +42,10 @@ local SKILL_NO_COST = 8
 local SKILL_INVALID = 9
 
 local ATTR_MAP = {
-    [51] = "atk",
-    [53] = "def",
-    [312] = "atk",
-    [186] = "def",
+    [25] = "atk",  -- 基础素质攻击
+    [27] = "atk",  -- 武器攻击
+    [312] = "atk", -- 扩展武器攻击
+    [30] = "def",  -- 本课接入的基础素质防御
 }
 
 local function IsEnemy(a, b)
@@ -142,11 +145,14 @@ function Scene:GetNeighborSet(gx, gz)
     return result
 end
 
-function Scene:Enter(uid, x, y, z)
+function Scene:Enter(uid, x, y, z, attrs)
     if not x then
         x, y, z = self.startPos[1], self.startPos[2], self.startPos[3]
     end
     local unit = SceneUnit.new()
+    unit:AttachComponent(AttributeComponent, 10, 0)
+    unit:AttachComponent(SkillComponent)
+
     unit.uid = uid
     unit.x = x
     unit.y = self:GetHeight(x, z) or y
@@ -155,6 +161,9 @@ function Scene:Enter(uid, x, y, z)
     unit.lastMoveAt = skynet.now() / 100
     unit.token = TOKEN_MAX
     unit.dead = false
+    if attrs then
+        self:ApplyBaseAttr(unit, attrs)
+    end
     self.units[uid] = unit
 
     self:AddToGrid(unit)
@@ -307,6 +316,25 @@ local function MergeReward(a, b)
     return a
 end
 
+-- 对本次受击者取实时防御。技能和怪物回退攻击可分别传入自己的伤害下限。
+function Scene:CalculateHitDamage(target, rawDamage, minimum)
+    local defense = target:GetComponent(AttributeComponent).def
+    return math.max(minimum, math.floor(rawDamage - defense))
+end
+
+local function ApplySkillHits(target, damagePerHit, hitCount)
+    local totalDamage = 0
+    for _ = 1, hitCount do
+        if target.hp <= 0 then
+            break
+        end
+
+        target.hp = math.max(0, target.hp - damagePerHit)
+        totalDamage = totalDamage + damagePerHit
+    end
+    return totalDamage
+end
+
 function Scene:CastSkill(uid, req, now)
     local unit = self.units[uid]
 
@@ -318,18 +346,20 @@ function Scene:CastSkill(uid, req, now)
         receivers = {},
     }
 
-    if not unit then
+    local skills = unit and unit:GetComponent(SkillComponent)
+    if not skills or not unit:GetComponent(AttributeComponent) then
         failed.code = SKILL_NOT_SELF
         return failed
     end
+
     if unit.dead then
         failed.code = SKILL_CASTER_DEAD
         return failed
     end
 
     local skill = ConfigRepository.Get("tbskilltable")[req.skillId]
-    local effect = skill and skill.EffectIDs and skill.EffectIDs[1]
-    effect = effect and ConfigRepository.Get("tbskilleffecttable")[effect]
+    local effectId = SkillConfig.GetEffectId(skill, req.skillLevel)
+    local effect = effectId and ConfigRepository.Get("tbskilleffecttable")[effectId]
     if not effect then
         failed.code = SKILL_INVALID
         return failed
@@ -348,6 +378,7 @@ function Scene:CastSkill(uid, req, now)
         return failed
     end
 
+    -- 技能冷却检查
     local cooldown = effect.PVECoolTime or 0
     local last = unit.skillCooldown[req.skillId]
     if last and now - last < cooldown then
@@ -355,17 +386,33 @@ function Scene:CastSkill(uid, req, now)
         return failed
     end
 
+    -- 技能组冷却检查
+    local groupId = effect.PVEGroupCoolTimeType or 0
+    local nowMs = math.floor(now * 1000 + 0.5)
+    local readyAtMs = unit.skillGroupReadyAtMs[groupId]
+    if readyAtMs and nowMs < readyAtMs then
+        failed.code = SKILL_COOLDOWNING
+        return failed
+    end
+
     -- SP 消耗
     local costType = effect.SkillCost and effect.SkillCost[1]
     local costValue = effect.SkillCost and effect.SkillCost[2] or 0
+    if costType == 7 and unit.sp < costValue then
+        failed.code = SKILL_NO_COST
+        return failed
+    end
+
+    local cast = skills:BeginCast(req, effectId, now)
     if costType == 7 then
-        if unit.sp < costValue then
-            failed.code = SKILL_NO_COST
-            return failed
-        end
         unit.sp = unit.sp - costValue
     end
+
     unit.skillCooldown[req.skillId] = now
+    local groupDurationMs = math.floor((effect.PVEGroupCoolTime or 0) * 1000 + 0.5)
+    if groupDurationMs > 0 then
+        unit.skillGroupReadyAtMs[groupId] = nowMs + groupDurationMs
+    end
 
     local ratio = (effect.PVEDamageRadio and effect.PVEDamageRadio[1] or 10000) / 10000
     local static = effect.PVEStaticDam and effect.PVEStaticDam[1] or 0
@@ -373,19 +420,11 @@ function Scene:CastSkill(uid, req, now)
     local hits = {}
     local rewardTotal = nil
 
+    local attack = unit:GetComponent(AttributeComponent).atk
     for _, target in ipairs(targets) do
-        local perHit = math.floor(unit.atk * ratio + static - (target.def or 0))
-        if ratio > 0 and perHit < 1 then perHit = 1 end
-        if perHit < 0 then perHit = 0 end
-
-        local totalDamage = 0
+        local perHit = self:CalculateHitDamage(target, attack * ratio + static, ratio > 0 and 1 or 0)
         local hitCount = effect.AttackCount and effect.AttackCount[1] or 1
-
-        for i = 1, hitCount do
-            if target.hp <= 0 then break end
-            target.hp = math.max(0, target.hp - perHit)
-            totalDamage = totalDamage + perHit
-        end
+        local totalDamage = ApplySkillHits(target, perHit, hitCount)
 
         if target:IsMonster() then
             target:AddHatred(uid, totalDamage, now)
@@ -408,7 +447,8 @@ function Scene:CastSkill(uid, req, now)
             end
         end
 
-        hits[#hits + 1] = {
+        table.insert(hits, {
+            castId = cast.castId,
             uid = target.uid,
             damage = totalDamage,
             hp = target.hp,
@@ -416,7 +456,7 @@ function Scene:CastSkill(uid, req, now)
             receivers = receivers,
             dead = dead,
             deadReceivers = deadReceivers,
-        }
+        })
 
         if dead and target:IsMonster() and unit:IsPlayer() then
             local r = self:GiveReward(unit, target)
@@ -439,6 +479,8 @@ function Scene:CastSkill(uid, req, now)
 
     return {
         code = SKILL_OK,
+        castId = cast.castId,
+        cast = cast,
         targetUid = primary.uid,
         damage = hits[1] and hits[1].damage or 0,
         targetHp = primary.hp,
@@ -518,7 +560,9 @@ function Scene:AddMonster(entityId, x, z)
     unit.speed = cfg.MoveSpeed
     unit.sight = cfg.Sight
     unit.aiType = cfg.AI[1]
-    unit.atk = cfg.BaseATK > 0 and cfg.BaseATK or 10
+    local attack = cfg.BaseATK > 0 and cfg.BaseATK or 10
+    unit:AttachComponent(AttributeComponent, attack, cfg.BaseDEF)
+    unit:AttachComponent(SkillComponent)
     unit.skillIds = cfg.UnitSkillID or {}
 
     self:AddUnit(unit)
@@ -734,7 +778,7 @@ end
 function Scene:ApplyBuff(uid, buffId, now)
     local unit = self.units[uid]
     local def = ConfigRepository.Get("tbbufftable")[buffId]
-    if not unit or not def then
+    if not unit or not unit:GetComponent(AttributeComponent) or not def then
         return nil
     end
 
@@ -794,17 +838,17 @@ function Scene:UpdateBuffs(now, events)
     end
 end
 
+function Scene:ApplyBaseAttr(unit, attrs)
+    return unit:GetComponent(AttributeComponent):SetBase(attrs)
+end
+
 function Scene:SetAttr(uid, attrs, now)
     local unit = self.units[uid]
-    if not unit then
+    if not unit or not unit:GetComponent(AttributeComponent) then
         return nil
     end
-    unit.baseAtk = attrs.atk or unit.baseAtk
-    unit.baseDef = attrs.def or unit.baseDef
-    unit.baseMaxHp = attrs.maxHp or unit.baseMaxHp
-    unit.baseMaxSp = attrs.maxSp or unit.baseMaxSp
 
-    local result = self:RecalcAttr(unit)
+    local result = self:ApplyBaseAttr(unit, attrs)
 
     local set = self:GetNeighborSet(unit.gx, unit.gz)
     local receivers = {}
@@ -850,32 +894,7 @@ function Scene:ParseBuffEffect(buffId)
 end
 
 function Scene:RecalcAttr(unit)
-    local atk = unit.baseAtk
-    local def = unit.baseDef
-    local maxHp = unit.baseMaxHp
-    local maxSp = unit.baseMaxSp
-
-    for _, buff in pairs(unit.buffs or {}) do
-        for field, value in pairs(buff.attr or {}) do
-            if field == "atk" then
-                atk = atk + value
-            elseif field == "def" then
-                def = def + value
-            elseif field == "maxHp" then
-                maxHp = maxHp + value
-            elseif field == "maxSp" then
-                maxSp = maxSp + value
-            end
-        end
-    end
-
-    unit.atk, unit.def = atk, def
-    unit.maxHp, unit.maxSp = maxHp, maxSp
-    unit.hp = math.min(unit.hp, unit.maxHp)
-    unit.sp = math.min(unit.sp, unit.maxSp)
-
-    return { atk = atk, def = def, maxHp = maxHp, maxSp = maxSp,
-             hp = unit.hp, sp = unit.sp }
+    return unit:GetComponent(AttributeComponent):Recalculate()
 end
 
 -- 主目标固定在首位，范围技能额外选取半径内存活的敌对战斗单位。

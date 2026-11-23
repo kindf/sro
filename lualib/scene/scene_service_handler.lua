@@ -14,8 +14,8 @@ function CMD.start()
     return true
 end
 
-function CMD.change_scene(uid, sceneId)
-    return SceneManager.GetInstance():ChangeScene(uid, sceneId)
+function CMD.change_scene(uid, sceneId, attrs)
+    return SceneManager.GetInstance():ChangeScene(uid, sceneId, attrs)
 end
 
 function CMD.leave(uid)
@@ -40,8 +40,8 @@ function CMD.cast_skill(uid, req)
 end
 
 -- 复活
-function CMD.revive(uid)
-    return SceneManager.GetInstance():Revice(uid)
+function CMD.revive(uid, attrs)
+    return SceneManager.GetInstance():Revice(uid, attrs)
 end
 
 -- 预检或领取目标掉落，由 world 在确认背包容量后发起正式领取。

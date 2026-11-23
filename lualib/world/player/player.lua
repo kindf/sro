@@ -4,9 +4,12 @@ local socket = require "skynet.socket"
 local skynet = require "skynet"
 local ProtocolHelper = require "protocol.protocol_helper"
 local ConfigRepository = require "common.config_repository"
+local SkillConfig = require "common.skill_config"
 
-local ATTR_ATK = 312
-local ATTR_DEF = 186
+local ATTR_BASIC_WEAPON_ATK = 27
+local ATTR_BASIC_WEAPONEX_ATK = 312
+local ATTR_BASIC_BASE_DEF = 30
+local SKILL_INVALID = 9
 
 ---@class Player
 ---@field fd number
@@ -19,6 +22,7 @@ local ATTR_DEF = 186
 ---@field baseAtk number
 ---@field baseDef number
 ---@field baseMaxHp number
+---@field learnedSkillLevels table<integer, integer> 技能 ID 对应角色已经学到的等级
 local Player = Class("Player")
 
 function Player:Ctor()
@@ -32,6 +36,7 @@ function Player:Ctor()
     self.baseAtk = 10
     self.baseDef = 0
     self.baseMaxHp = 1000
+    self.learnedSkillLevels = {}
 end
 
 function Player:SendPackage(package)
@@ -50,7 +55,7 @@ function Player:OnBorn(sceneId)
 end
 
 function Player:ChangeScene(sceneId)
-    local ok, data = skynet.call(".scene", "lua", "change_scene", self.uid, sceneId)
+    local ok, data = skynet.call(".scene", "lua", "change_scene", self.uid, sceneId, self:CalcAttr())
     if not ok or not data then
         Logger.Error("[Player]ChangeScene failed. uid:%s sceneId:%s reason:%s", tostring(self.uid), tostring(sceneId), tostring(data))
         return nil
@@ -88,8 +93,18 @@ function Player:ReqMove(req)
 end
 
 function Player:CastSkill(req)
+    local learnedLevel = self.learnedSkillLevels[req.skillId] or 0
+    if learnedLevel <= 0 then
+        return{
+            code = SKILL_INVALID,
+            targetUid = req.targetUid,
+            damage = 0,
+            targetHp = 0,
+        }
+    end
     local ok, result = skynet.call(".scene", "lua", "cast_skill", self.uid, {
         skillId = req.skillId,
+        skillLevel = learnedLevel,
         targetUid = req.targetUid,
     })
     if not ok or not result then
@@ -99,7 +114,7 @@ function Player:CastSkill(req)
 end
 
 function Player:Revive()
-    local ok, result = skynet.call(".scene", "lua", "revive", self.uid)
+    local ok, result = skynet.call(".scene", "lua", "revive", self.uid, self:CalcAttr())
     if not ok or not result then
         return nil
     end
@@ -277,9 +292,9 @@ function Player:CalcAttr()
         if cfg then
             for _, entry in ipairs(cfg.BaseAttributes or {}) do
                 local attrId, value = entry[2], entry[3]
-                if attrId == ATTR_ATK then
+                if attrId == ATTR_BASIC_WEAPON_ATK or attrId == ATTR_BASIC_WEAPONEX_ATK then
                     atk = atk + value
-                elseif attrId == ATTR_DEF then
+                elseif attrId == ATTR_BASIC_BASE_DEF then
                     def = def + value
                 end
             end
@@ -356,6 +371,22 @@ function Player:SyncAttr()
         return nil
     end
     return data
+end
+
+-- 按配置授予指定等级。越界时保留角色原等级，重复授予不会降级。
+function Player:LearnSkill(skillId, level)
+    if level == nil then
+        level = 1
+    end
+    local skill = ConfigRepository.Get("tbskilltable")[skillId]
+    if not SkillConfig.GetEffectId(skill, level) then
+        return false
+    end
+
+    if (self.learnedSkillLevels[skillId] or 0) < level then
+        self.learnedSkillLevels[skillId] = level
+    end
+    return true
 end
 
 return Player

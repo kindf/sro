@@ -19,14 +19,10 @@ local Logger = require "common.logger"
 ---@field jobExp number
 ---@field level number
 ---@field buffs table
----@field baseAtk number
----@field baseDef number
----@field baseMaxHp number
----@field atk number
----@field def number
 ---@field sp number
 ---@field maxSp number
----@field baseMaxSp number
+---@field skillGroupReadyAtMs table
+---@field components table
 local SceneUnit = Class("SceneUnit")
 
 function SceneUnit:Ctor()
@@ -49,15 +45,24 @@ function SceneUnit:Ctor()
     self.level = 1
     self.buffs = {}
 
-    self.baseAtk = 10
-    self.baseDef = 0
-    self.baseMaxHp = 1000
-    self.atk = 10
-    self.def = 0
-
     self.sp = 100
     self.maxSp = 100
-    self.baseMaxSp = 100
+
+    -- 按组号记录本单位可再次使用该组技能的场景时刻，单位为毫秒。
+    self.skillGroupReadyAtMs = {}
+
+    self.components = {}
+end
+
+function SceneUnit:AttachComponent(componentType, ...)
+    assert(not self.components[componentType], "component already attached")
+    local component = componentType.new(self, ...)
+    self.components[componentType] = component
+    return component
+end
+
+function SceneUnit:GetComponent(componentType)
+    return self.components[componentType]
 end
 
 function SceneUnit:UpdateAI(scene, now, events)

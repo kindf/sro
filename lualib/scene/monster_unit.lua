@@ -124,8 +124,9 @@ function MonsterUnit:UpdateAI(scene, now, events)
         return
     end
 
-     self.nextAttackAt = now + ATTACK_CD
-    target.hp = math.max(0, target.hp - ATTACK_DAMAGE)
+    self.nextAttackAt = now + ATTACK_CD
+    local damage = scene:CalculateHitDamage(target, ATTACK_DAMAGE, 1)
+    target.hp = math.max(0, target.hp - damage)
 
     local dead = false
     if target.hp == 0 and not target.dead then
@@ -246,6 +247,7 @@ function MonsterUnit:TryCastSkills(scene, target, now, events)
 
         local result = scene:CastSkill(self.uid, {
             skillId = skillId,
+            skillLevel = entry[2],
             targetUid = target.uid,
         }, now)
 
@@ -253,6 +255,7 @@ function MonsterUnit:TryCastSkills(scene, target, now, events)
             for _, hit in ipairs(result.hits or {}) do
                 table.insert(events, {
                     kind = "hp",
+                    castId = result.castId,
                     uid = hit.uid,
                     hp = hit.hp,
                     maxHp = hit.maxHp,
@@ -261,6 +264,7 @@ function MonsterUnit:TryCastSkills(scene, target, now, events)
                 if hit.dead then
                     table.insert(events, {
                         kind = "dead",
+                        castId = result.castId,
                         uid = hit.uid,
                         receivers = hit.deadReceivers,
                     })
@@ -270,6 +274,7 @@ function MonsterUnit:TryCastSkills(scene, target, now, events)
             for _, buff in ipairs(result.buffs or {}) do
                 events[#events + 1] = {
                     kind = "buff",
+                    castId = result.castId,
                     uid = buff.uid,
                     buffId = buff.buffId,
                     duration = buff.duration,
@@ -278,6 +283,7 @@ function MonsterUnit:TryCastSkills(scene, target, now, events)
                 local attr = buff.attr
                 table.insert(events, {
                     kind = "attr", uid = buff.uid, receivers = buff.receivers,
+                    castId = result.castId,
                     atk = attr.atk, def = attr.def, maxHp = attr.maxHp, hp = attr.hp,
                     maxSp = attr.maxSp, sp = attr.sp,
                 })

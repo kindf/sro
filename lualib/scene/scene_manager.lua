@@ -44,7 +44,7 @@ end
 
 --- 进入/切换场景统一入口。
 --- oldScene 为 nil 就是首次进入；oldScene == newScene 就是原地不动。
-function SceneManager:ChangeScene(uid, newSceneId)
+function SceneManager:ChangeScene(uid, newSceneId, attrs)
     local newScene = self:GetScene(newSceneId)
     if not newScene then
         return nil, "scene not found"
@@ -67,7 +67,7 @@ function SceneManager:ChangeScene(uid, newSceneId)
     end
 
     self:SetPlayerScene(uid, newScene)
-    local newUnit, newOthers = newScene:Enter(uid, nil, nil, nil)
+    local newUnit, newOthers = newScene:Enter(uid, nil, nil, nil, attrs)
 
     return {
         same = false,
@@ -121,14 +121,14 @@ function SceneManager:CastSkill(uid, req, now)
     return scene:CastSkill(uid, req, now)
 end
 
-function SceneManager:Revice(uid)
+function SceneManager:Revice(uid, attrs)
     local scene = self.playerSceneMap[uid]
     if not scene then
         Logger.Error("[SceneManager]Revice: Player with uid %s is not in any scene.", tostring(uid))
         return nil, "not in scene"
     end
     local oldUnit, oldOthers = scene:Leave(uid)
-    local newUnit, newOthers = scene:Enter(uid, nil, nil, nil)
+    local newUnit, newOthers = scene:Enter(uid, nil, nil, nil, attrs)
     return {
         oldUnit = oldUnit,
         oldOthers = oldOthers or {},

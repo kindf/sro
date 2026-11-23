@@ -233,31 +233,36 @@ local function ReqDropItem(player, req)
 end
 ProtocolHelper.RegisterPTCHandler("Scene.ReqDropItem", ReqDropItem)
 
-local function ReqEquipItem(player, req)
-    local data = player:EquipItem(req.slot)
-    if not data then return end
+local function SendEquipmentResult(player, responseName, data)
+    if not data then
+        return
+    end
 
-    player:SendPackage(ProtocolHelper.EncodePTCPacket("Scene.RespEquipItem", {
+    player:SendPackage(ProtocolHelper.EncodePTCPacket(responseName, {
         code = data.code,
         equipSlot = data.equipSlot or 0,
         itemId = data.itemId or 0,
     }))
+    if data.code ~= 0 then return end
 
-    if data.code == 0 then
-        player:SendItems()
-
-        local attr = player:SyncAttr()
-        if attr then
-            local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitAttr", {
-                uid = attr.uid,
-                atk = attr.atk,
-                def = attr.def,
-                maxHp = attr.maxHp,
-                hp = attr.hp,
-            })
-            PlayerManager.GetInstance():SendUidsPacket(attr.receivers, packet)
-        end
+    player:SendItems()
+    local attr = player:SyncAttr()
+    if attr then
+        local packet = ProtocolHelper.EncodePTCPacket("Scene.UnitAttr", {
+            uid = attr.uid, atk = attr.atk, def = attr.def,
+            maxHp = attr.maxHp, hp = attr.hp,
+        })
+        PlayerManager.GetInstance():SendUidsPacket(attr.receivers, packet)
     end
 end
+
+local function ReqEquipItem(player, req)
+    SendEquipmentResult(player, "Scene.RespEquipItem", player:EquipItem(req.slot))
+end
 ProtocolHelper.RegisterPTCHandler("Scene.ReqEquipItem", ReqEquipItem)
+
+local function ReqUnequipItem(player, req)
+    SendEquipmentResult(player, "Scene.RespUnequipItem", player:UnequipItem(req.equipSlot))
+end
+ProtocolHelper.RegisterPTCHandler("Scene.ReqUnequipItem", ReqUnequipItem)
 
