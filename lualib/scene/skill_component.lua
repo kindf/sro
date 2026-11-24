@@ -1,5 +1,6 @@
 local Class = require "common.class"
 local FightGroupComponent = require "scene.fight_group_component"
+local f32 = require "common.float32"
 
 ---@class SkillComponent
 ---@field owner SceneUnit
@@ -9,6 +10,8 @@ local SkillComponent = Class("SkillComponent")
 -- 同一个场景服务中的所有施法者共用序号。换图重建组件时继续取下一个号。
 local lastCastId = 0
 
+-- sp 的属性id
+local ATTR_BASIC_SP = 7
 local RANGE_UNIT = 0
 local TARGET_ALL = 0
 local TARGET_ENEMY = 4
@@ -18,6 +21,34 @@ local TARGET_DEAD_FRIEND = 5
 function SkillComponent:Ctor(owner)
     self.owner = owner
     self.lastCast = nil
+end
+
+-- 只计算本次施法的 SP 门槛，不修改资源。当前效果表使用 {0,0} 或 {7,基础值}。
+function SkillComponent:GetRequiredSp(skillUuid, cost)
+    if not cost or #cost ~= 2 then
+        return nil
+    end
+    if cost[1] == 0 and cost[2] == 0 then
+        return 0
+    end
+
+    if cost[1] ~= ATTR_BASIC_SP then
+        return nil
+    end
+
+    local rate = 0
+    for _, buff in pairs(self.owner.buffs) do
+        if buff.spCostRates then
+            rate = rate + (buff.spCostRates[skillUuid] or 0)
+        end
+    end
+    local base = cost[2]
+    if rate == 0 then
+        return base
+    end
+    local multiplier = f32(1 + f32(f32(rate) / 10000))
+    local required = math.modf(f32(f32(base) * multiplier))
+    return required
 end
 
 -- 只处理锁定活单位的敌方和友方主目标；其它技能沿用原有选取方式。

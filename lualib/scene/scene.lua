@@ -478,9 +478,13 @@ function Scene:CastSkill(uid, req, now)
     end
 
     -- SP 消耗
-    local costType = effect.SkillCost and effect.SkillCost[1]
-    local costValue = effect.SkillCost and effect.SkillCost[2] or 0
-    if costType == 7 and unit.sp < costValue then
+    local requiredSp = skills:GetRequiredSp(skill.SkillUuid, effect.SkillCost)
+    if requiredSp == nil then
+        failed.code = SKILL_INVALID
+        return failed
+    end
+
+    if unit.sp < requiredSp then
         failed.code = SKILL_NO_COST
         return failed
     end
@@ -489,8 +493,8 @@ function Scene:CastSkill(uid, req, now)
         targets = SelectGroundTargets(self, unit, point, skill, effect)
     end
     local cast = skills:BeginCast(req, effectId, now, primary and primary.uid or 0, point)
-    if costType == 7 then
-        unit.sp = unit.sp - costValue
+    if requiredSp ~= 0 then
+        unit.sp = unit.sp - requiredSp
     end
 
     unit.skillCooldown[req.skillId] = now
@@ -866,9 +870,11 @@ function Scene:ApplyBuff(uid, buffId, now)
         duration = math.floor(def.DestroyTiming[1][2])
     end
 
+    local attrBonus, spCostRates = self:ParseBuffEffect(buffId)
     unit.buffs[buffId] = {
         expireAt = now + duration,
-        attr = self:ParseBuffEffect(buffId),
+        attr = attrBonus,
+        spCostRates = spCostRates,
     }
 
     local attrs = self:RecalcAttr(unit)
@@ -945,13 +951,22 @@ function Scene:SetAttr(uid, attrs, now)
     }
 end
 
+-- 类型 16 的首项是技能 UUID，枚举 12 表示该技能消耗的万分比变化。
+local function AddSpCostRate(rates, effect)
+    local params = (effect.EffectParam or "") .. "|"
+    local uuid = tonumber(params:match("^(%d+)|"))
+    local rate = tonumber(params:match("|12=(%-?%d+)|"))
+    if uuid and rate then
+        rates[uuid] = (rates[uuid] or 0) + rate
+    end
+end
+
 function Scene:ParseBuffEffect(buffId)
     local def = ConfigRepository.Get("tbbufftable")[buffId]
+    local attr, spCostRates = {}, {}
     if not def then
-        return {}
+        return attr, spCostRates
     end
-
-    local attr = {}
 
     for _, effectId in ipairs(def.EffectGroup or {}) do
         local effect = ConfigRepository.Get("tbbuffeffecttable")[effectId]
@@ -966,10 +981,12 @@ function Scene:ParseBuffEffect(buffId)
                     end
                 end
             end
+        elseif effect and effect.EffectType == 16 and effect.TriggerTiming[1] == 0
+            and effect.TriggerCondition == "" then
+                AddSpCostRate(spCostRates, effect)
         end
     end
-
-    return attr
+    return attr, spCostRates
 end
 
 function Scene:RecalcAttr(unit)

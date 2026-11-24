@@ -1,11 +1,7 @@
 local ConfigRepository = require "common.config_repository"
+local f32 = require "common.float32"
 
 local SkillRange = {}
-
--- Lua 的 number 通常是 double。原版 Vector3 和射程字段都以 float 参与运算。
-local function f32(value)
-    return (string.unpack("<f", string.pack("<f", value)))
-end
 
 local ZERO_EPSILON = f32(1e-6)
 local BASE_TOLERANCE = f32(0.1)
