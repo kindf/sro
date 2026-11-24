@@ -1,5 +1,6 @@
 local Class = require "common.class"
 local Logger = require "common.logger"
+local BattleEventDispatcher = require "scene.battle_event_dispatcher"
 
 ---@class SceneUnit
 ---@field uid number
@@ -23,6 +24,7 @@ local Logger = require "common.logger"
 ---@field maxSp number
 ---@field skillGroupReadyAtMs table
 ---@field components table
+---@field battleEvents BattleEventDispatcher
 local SceneUnit = Class("SceneUnit")
 
 function SceneUnit:Ctor()
@@ -52,6 +54,8 @@ function SceneUnit:Ctor()
     self.skillGroupReadyAtMs = {}
 
     self.components = {}
+
+    self.battleEvents = BattleEventDispatcher.new()
 end
 
 function SceneUnit:AttachComponent(componentType, ...)

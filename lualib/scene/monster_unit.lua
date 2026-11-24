@@ -18,6 +18,7 @@ local ATTACK_DAMAGE = 50
 ---@field hatred table<number, table>
 ---@field leashRange number
 ---@field skillIds table
+---@field lastBeHit table|nil 最近一次实际 HP 变化的来源及差值
 local MonsterUnit = Class("MonsterUnit", SceneUnit)
 
 function MonsterUnit:Ctor(entityId, x, z)
@@ -40,6 +41,12 @@ function MonsterUnit:Ctor(entityId, x, z)
     self.pathIndex = 1
     self.pathGoalX = nil
     self.pathGoalZ = nil
+
+    self.lastBeHit = nil
+end
+
+function MonsterUnit:OnBeHit(event)
+    self.lastBeHit = {firerUid = event.firerUid, hpChange = event.hpChange}
 end
 
 function MonsterUnit:Pack()

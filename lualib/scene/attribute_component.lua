@@ -16,6 +16,25 @@ function AttributeComponent:Ctor(owner, attack, defense)
     self.atk, self.def = attack, defense
 end
 
+-- 写入一段技能造成的 HP 变化，让监听器能立即读到本段结算后的血量
+function AttributeComponent:ApplyHit(scene, firerUid, damage)
+    local unit = self.owner
+    local before = unit.hp
+    unit.hp = math.max(0, before - damage)
+    local delta = unit.hp - before
+    if delta == 0 then
+        return
+    end
+
+    scene.battleEvents:Dispatch({
+        type = "kActionHpChange",
+        entityUid = unit.uid,
+        firerUid = firerUid,
+        mercenaryUid = 0,
+        hpChange = delta,
+    })
+end
+
 function AttributeComponent:SetBase(attrs)
     self.baseAtk = attrs.atk or self.baseAtk
     self.baseDef = attrs.def or self.baseDef

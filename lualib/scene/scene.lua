@@ -11,6 +11,7 @@ local AttributeComponent = require "scene.attribute_component"
 local SkillComponent = require "scene.skill_component"
 local FightGroupComponent = require "scene.fight_group_component"
 local SkillRange = require "scene.skill_range"
+local BattleEventDispatcher = require "scene.battle_event_dispatcher"
 
 -- 场景尚未同步职业模型，先使用基础跑速
 local NOVICE_PRESENT_ID = 10
@@ -113,6 +114,7 @@ end
 ---@field monsterSeq number
 ---@field dropSeq number
 ---@field heightLayers table
+---@field battleEvents BattleEventDispatcher
 local Scene = Class("Scene")
 
 function Scene:Ctor(cfg)
@@ -139,6 +141,23 @@ function Scene:Ctor(cfg)
     self.dropSeq = 0
 
     self.heightLayers = {}
+
+    self.battleEvents = BattleEventDispatcher.new()
+    self.battleEvents:AddStaticListener("kActionHpChange", function(event)
+        self:OnObjectHpChange(event)
+    end)
+end
+
+function Scene:OnObjectHpChange(event)
+    local target = self:GetUnit(event.entityUid)
+    if not target then
+        return
+    end
+
+    if target:IsMonster() then
+        target:OnBeHit(event)
+    end
+    target.battleEvents:Dispatch(event)
 end
 
 function Scene:LoadGrid(grid)
@@ -373,14 +392,15 @@ function Scene:CalculateHitDamage(target, rawDamage, minimum)
     return math.max(minimum, math.floor(rawDamage - defense))
 end
 
-local function ApplySkillHits(target, damagePerHit, hitCount)
+local function ApplySkillHits(scene, target, firerUid, damagePerHit, hitCount)
+    local attributes = target:GetComponent(AttributeComponent)
     local totalDamage = 0
     for _ = 1, hitCount do
         if target.hp <= 0 then
             break
         end
 
-        target.hp = math.max(0, target.hp - damagePerHit)
+        attributes:ApplyHit(scene, firerUid, damagePerHit)
         totalDamage = totalDamage + damagePerHit
     end
     return totalDamage
@@ -517,7 +537,7 @@ function Scene:CastSkill(uid, req, now)
     for _, target in ipairs(targets) do
         local perHit = self:CalculateHitDamage(target, attack * ratio + static, ratio > 0 and 1 or 0)
         local hitCount = effect.AttackCount and effect.AttackCount[1] or 1
-        local totalDamage = ApplySkillHits(target, perHit, hitCount)
+        local totalDamage = ApplySkillHits(self, target, uid, perHit, hitCount)
 
         if target:IsMonster() then
             target:AddHatred(uid, totalDamage, now)
