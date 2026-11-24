@@ -106,6 +106,7 @@ function Player:CastSkill(req)
         skillId = req.skillId,
         skillLevel = learnedLevel,
         targetUid = req.targetUid,
+        castPoint = req.castPoint,
     })
     if not ok or not result then
         return nil

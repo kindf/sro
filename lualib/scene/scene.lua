@@ -43,6 +43,11 @@ local SKILL_CASTER_DEAD = 7
 local SKILL_NO_COST = 8
 local SKILL_INVALID = 9
 
+local RANGE_UNIT = 0
+local RANGE_GROUND = 2
+local TARGET_ENEMY = 4
+local SHAPE_CIRCLE = 1
+
 local ATTR_MAP = {
     [25] = "atk",  -- 基础素质攻击
     [27] = "atk",  -- 武器攻击
@@ -52,6 +57,35 @@ local ATTR_MAP = {
 
 local function IsEnemy(a, b)
     return (a:IsMonster() and b:IsPlayer()) or (a:IsPlayer() and b:IsMonster())
+end
+
+-- 射程和地面圆心均使用 XZ 平面；Y 留在快照供后续空间检查
+local function HorizontalDistance(a, b)
+    return math.sqrt((a.x - b.x)^2 + (a.z - b.z)^2)
+end
+
+-- 显式点地没有主目标。按现有配置半径取圆内敌人，未接入的形状留给打击课
+local function SelectGroundTargets(scene, caster, point, skill, effect)
+    local targets = {}
+    if not skill.IsAoe or skill.TargetType ~= TARGET_ENEMY or effect.EffectShape ~= SHAPE_CIRCLE then
+        return targets
+    end
+
+    local radius = effect.EffectRange and effect.EffectRange[1]
+    if not radius or radius <= 0 then
+        return targets
+    end
+
+    local casterGroup = caster:GetComponent(FightGroupComponent)
+    for _, candidate in pairs(scene.units) do
+        if candidate ~= caster and not candidate.dead and HorizontalDistance(point, candidate) <= radius then
+            local group = candidate:GetComponent(FightGroupComponent)
+            if group and FightGroupComponent.IsEnemy(group, casterGroup) then
+                table.insert(targets, candidate)
+            end
+        end
+    end
+    return targets
 end
 
 ---@class Scene
@@ -338,6 +372,24 @@ local function ApplySkillHits(target, damagePerHit, hitCount)
     return totalDamage
 end
 
+local function BuildCastResult(cast, primary, hits, buffs, reward)
+    local first = hits[1]
+    return {
+        code = SKILL_OK,
+        castId = cast.castId,
+        cast = cast,
+        targetUid = cast.targetUid,
+        damage = first and first.damage or 0,
+        targetHp = primary and primary.hp or 0,
+        maxHp = primary and primary.maxHp or 0,
+        hits = hits,
+        dead = first and first.dead or false,
+        reward = reward,
+        buffs = buffs,
+    }
+end
+
+
 function Scene:CastSkill(uid, req, now)
     local unit = self.units[uid]
 
@@ -368,15 +420,28 @@ function Scene:CastSkill(uid, req, now)
         return failed
     end
 
-    local targets = self:SelectSkillTargets(uid, skill, effect, req.targetUid)
-    if not targets then
-        failed.code = SKILL_NO_TARGET
+    local reported = req.castPoint
+    local ground = skill.SkillTargetRangeType == RANGE_GROUND and reported ~= nil
+    local primary, targets
+    if ground then
+        failed.targetUid = 0
+    else
+        targets = self:SelectSkillTargets(uid, skill, effect, req.targetUid)
+        if not targets then
+            failed.code = SKILL_NO_TARGET
+            return failed
+        end
+        primary = targets[1]
+    end
+    if reported ~= nil and (not _Finite(reported.x) or not _Finite(reported.y) or not _Finite(reported.z)) then
+        failed.code = SKILL_OUT_RANGE
         return failed
     end
 
-    local primary = targets[1]
-    local dist = math.sqrt((primary.x - unit.x)^2 + (primary.z - unit.z)^2)
-    if dist > (effect.FarRange or 2.0) then
+    local point = ground and reported or primary
+    local far = effect.FarRange or 2.0
+    if HorizontalDistance(unit, point) > far or
+        (skill.SkillTargetRangeType == RANGE_UNIT and reported and HorizontalDistance(unit, reported) > far) then
         failed.code = SKILL_OUT_RANGE
         return failed
     end
@@ -406,7 +471,10 @@ function Scene:CastSkill(uid, req, now)
         return failed
     end
 
-    local cast = skills:BeginCast(req, effectId, now)
+    if ground then
+        targets = SelectGroundTargets(self, unit, point, skill, effect)
+    end
+    local cast = skills:BeginCast(req, effectId, now, primary and primary.uid or 0, point)
     if costType == 7 then
         unit.sp = unit.sp - costValue
     end
@@ -415,6 +483,10 @@ function Scene:CastSkill(uid, req, now)
     local groupDurationMs = math.floor((effect.PVEGroupCoolTime or 0) * 1000 + 0.5)
     if groupDurationMs > 0 then
         unit.skillGroupReadyAtMs[groupId] = nowMs + groupDurationMs
+    end
+
+    if #targets == 0 or (primary and primary.dead) then
+        return BuildCastResult(cast, primary, {}, {})
     end
 
     local ratio = (effect.PVEDamageRadio and effect.PVEDamageRadio[1] or 10000) / 10000
@@ -480,19 +552,7 @@ function Scene:CastSkill(uid, req, now)
         end
     end
 
-    return {
-        code = SKILL_OK,
-        castId = cast.castId,
-        cast = cast,
-        targetUid = primary.uid,
-        damage = hits[1] and hits[1].damage or 0,
-        targetHp = primary.hp,
-        maxHp = primary.maxHp,
-        hits = hits,
-        dead = hits[1] and hits[1].dead or false,
-        reward = rewardTotal,
-        buffs = buffs,
-    }
+    return BuildCastResult(cast, primary, hits, buffs, rewardTotal)
 end
 
 function Scene:GiveReward(player, monster)
@@ -905,7 +965,7 @@ end
 function Scene:SelectSkillTargets(uid, skill, effect, primaryUid)
     local caster = self.units[uid]
     local primary = self.units[primaryUid]
-    if not caster or not primary or primary.dead or not (primary:IsMonster() or primary:IsPlayer()) then
+    if not caster or not primary or not (primary:IsMonster() or primary:IsPlayer()) then
         return nil
     end
 

@@ -1,5 +1,5 @@
 
-’
+ƒ
 scene.protoScene"e
 ReqMove
 common (Rcommon
@@ -28,10 +28,15 @@
 count
  (Rcount"
 	UnitLeave
-uid (Ruid"F
+uid (Ruid":
+SkillCastPoint
+x (Rx
+y (Ry
+z (Rz"{
 ReqCastSkill
 skillId (RskillId
-	targetUid (R	targetUid"Z
+	targetUid (R	targetUid3
+	castPoint (2.Scene.SkillCastPointR	castPoint"Z
 SkillHit
 uid (Ruid
 damage (Rdamage
