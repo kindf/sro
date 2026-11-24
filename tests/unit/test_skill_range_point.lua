@@ -49,13 +49,13 @@ function skynet.call(address, protocol, command, ...)
     return true, result, reason
 end
 
--- 使用平坦空地图，原点距施法者 1 米，远点在另一个轴上距施法者 10 米。
+-- 原点距施法者 1 米；远点取 14 米，超过暴风雪带玩家容差后的 13 米上限。
 local mapId = 4
 local scene = Scene.new({ID = mapId, StartPos = {{1, 0, 0}}})
 scene:LoadGrid(nil)
 scenes.scenes[mapId] = scene
 local near = {x = 0, y = 0, z = 0}
-local far = {x = 1, y = 0, z = 10}
+local far = {x = 1, y = 0, z = 14}
 
 -- 经正常进图命令装载角色，记录服务端发给他的消息。
 local function enter(fd)

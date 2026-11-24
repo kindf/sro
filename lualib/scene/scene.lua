@@ -10,7 +10,10 @@ local SkillConfig = require "common.skill_config"
 local AttributeComponent = require "scene.attribute_component"
 local SkillComponent = require "scene.skill_component"
 local FightGroupComponent = require "scene.fight_group_component"
+local SkillRange = require "scene.skill_range"
 
+-- 场景尚未同步职业模型，先使用基础跑速
+local NOVICE_PRESENT_ID = 10
 
 local MAX_SPEED       = 6.0   -- 占位，后面从属性表取
 local SPEED_TOLERANCE = 2.0   -- 允许 2 倍速度
@@ -43,8 +46,10 @@ local SKILL_CASTER_DEAD = 7
 local SKILL_NO_COST = 8
 local SKILL_INVALID = 9
 
-local RANGE_UNIT = 0
-local RANGE_GROUND = 2
+-- 技能范围类型
+local RANGE_UNIT = 0 -- 指定目标类型
+local RANGE_GROUND = 2 -- 地面范围类型
+
 local TARGET_ENEMY = 4
 local SHAPE_CIRCLE = 1
 
@@ -198,6 +203,7 @@ function Scene:Enter(uid, x, y, z, attrs)
     unit.lastMoveAt = skynet.now() / 100
     unit.token = TOKEN_MAX
     unit.dead = false
+    unit.speed = ConfigRepository.Get("tbpresenttable")[NOVICE_PRESENT_ID].RunSpeed
     if attrs then
         self:ApplyBaseAttr(unit, attrs)
     end
@@ -439,9 +445,9 @@ function Scene:CastSkill(uid, req, now)
     end
 
     local point = ground and reported or primary
-    local far = effect.FarRange or 2.0
-    if HorizontalDistance(unit, point) > far or
-        (skill.SkillTargetRangeType == RANGE_UNIT and reported and HorizontalDistance(unit, reported) > far) then
+    local lockedTarget = skill.SkillTargetRangeType == RANGE_UNIT and primary or nil
+    local requestPoint = lockedTarget and reported or point
+    if not SkillRange.Contains(unit, requestPoint, lockedTarget, effect) then
         failed.code = SKILL_OUT_RANGE
         return failed
     end
@@ -621,6 +627,7 @@ function Scene:AddMonster(entityId, x, z)
     unit.hp = cfg.BaseHP
     unit.maxHp = cfg.BaseHP
     unit.speed = cfg.MoveSpeed
+    unit.singingTargetRadius = SkillRange.MonsterRadius(cfg.PresentID)
     unit.sight = cfg.Sight
     unit.aiType = cfg.AI[1]
     local attack = cfg.BaseATK > 0 and cfg.BaseATK or 10
