@@ -69,10 +69,17 @@ local function HorizontalDistance(a, b)
     return math.sqrt((a.x - b.x)^2 + (a.z - b.z)^2)
 end
 
+-- 两种请求格式共用地面圆形敌对技能的判定条件。
+local function IsEnemyGroundCircle(skill, effect)
+    return skill.SkillTargetRangeType == RANGE_GROUND and skill.IsAoe
+        and skill.TargetType == TARGET_ENEMY and effect.EffectShape == SHAPE_CIRCLE
+end
+
 -- 显式点地没有主目标。按现有配置半径取圆内敌人，未接入的形状留给打击课
 local function SelectGroundTargets(scene, caster, point, skill, effect)
     local targets = {}
-    if not skill.IsAoe or skill.TargetType ~= TARGET_ENEMY or effect.EffectShape ~= SHAPE_CIRCLE then
+
+    if not IsEnemyGroundCircle(skill, effect) then
         return targets
     end
 
@@ -85,7 +92,8 @@ local function SelectGroundTargets(scene, caster, point, skill, effect)
     for _, candidate in pairs(scene.units) do
         if candidate ~= caster and not candidate.dead and HorizontalDistance(point, candidate) <= radius then
             local group = candidate:GetComponent(FightGroupComponent)
-            if group and FightGroupComponent.IsEnemy(group, casterGroup) then
+            if group and FightGroupComponent.IsEnemy(group, casterGroup)
+                and SkillRange.WithinDamageHeight(point, candidate) then
                 table.insert(targets, candidate)
             end
         end
@@ -984,6 +992,7 @@ function Scene:SelectSkillTargets(uid, skill, effect, primaryUid)
     local targets = {primary}
 
     if skill.IsAoe then
+        local groundCircle = IsEnemyGroundCircle(skill, effect)
         local radius = effect.EffectRange and effect.EffectRange[1] or 0
         if radius <= 0 then
             radius = 3.0
@@ -992,7 +1001,7 @@ function Scene:SelectSkillTargets(uid, skill, effect, primaryUid)
         for id, u in pairs(self.units) do
             if id ~= uid and id ~= primaryUid and not u.dead and IsEnemy(caster, u) then
                 local d = math.sqrt((u.x - primary.x)^2 + (u.z - primary.z)^2)
-                if d <= radius then
+                if d <= radius and (not groundCircle or SkillRange.WithinDamageHeight(primary, u)) then
                     table.insert(targets, u)
                 end
             end

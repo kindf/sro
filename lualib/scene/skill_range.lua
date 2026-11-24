@@ -9,6 +9,8 @@ end
 
 local ZERO_EPSILON = f32(1e-6)
 local BASE_TOLERANCE = f32(0.1)
+-- 打击范围允许垂直高差，单位为米
+local DAMAGE_DISTANCE_HEIGHT = 6.0
 local ROLE_INTERVAL = f32(100/1000)
 local AI_INTERVAL = f32(299/1000)
 
@@ -21,6 +23,12 @@ local function horizontalDistance(a, b)
     end
     local squared = f32(f32(dx * dx) + f32(dz * dz))
     return f32(math.sqrt(squared))
+end
+
+-- 比较打击中心和单位的场景高度；等于上下限时仍在范围内。
+function SkillRange.WithinDamageHeight(center, target)
+    local dy = f32(f32(center.y) - f32(target.y))
+    return math.abs(dy) <= DAMAGE_DISTANCE_HEIGHT
 end
 
 function SkillRange.MonsterRadius(presentId)
