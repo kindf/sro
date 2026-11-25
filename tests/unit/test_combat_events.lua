@@ -124,8 +124,8 @@ do
     -- 参数依次为：从上次请求起推进的 tick、结果码、剩余 HP、上次成功施法的秒数。
     checkCast(0,  0, 11, 0)
     checkCast(0,  4, 11, 0)
-    checkCast(99, 4, 11, 0)
-    checkCast(1,  0,  1, 1)
+    checkCast(89, 4, 11, 0)
+    checkCast(1,  0,  1, 0.90)
 end
 
 local scene = Scene.new({ID = 1, StartPos = {{0,0,0}}})

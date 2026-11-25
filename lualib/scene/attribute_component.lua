@@ -11,6 +11,7 @@ local AttributeComponent = Class("AttributeComponent")
 
 function AttributeComponent:Ctor(owner, attack, defense)
     self.owner = owner
+    self.aspd = 10000
     self.baseAtk, self.baseDef = attack, defense
     self.baseMaxHp, self.baseMaxSp = owner.maxHp, owner.maxSp
     self.atk, self.def = attack, defense
@@ -40,6 +41,7 @@ function AttributeComponent:SetBase(attrs)
     self.baseDef = attrs.def or self.baseDef
     self.baseMaxHp = attrs.maxHp or self.baseMaxHp
     self.baseMaxSp = attrs.maxSp or self.baseMaxSp
+    self.aspd = attrs.aspd or self.aspd
     return self:Recalculate()
 end
 

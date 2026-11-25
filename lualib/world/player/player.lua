@@ -23,6 +23,7 @@ local SKILL_INVALID = 9
 ---@field baseDef number
 ---@field baseMaxHp number
 ---@field learnedSkillLevels table<integer, integer> 技能 ID 对应角色已经学到的等级
+---@field aspd number
 local Player = Class("Player")
 
 function Player:Ctor()
@@ -37,6 +38,8 @@ function Player:Ctor()
     self.baseDef = 0
     self.baseMaxHp = 1000
     self.learnedSkillLevels = {}
+    -- 最终攻速，单位为万分点
+    self.aspd = 10000
 end
 
 function Player:SendPackage(package)
@@ -302,7 +305,7 @@ function Player:CalcAttr()
         end
     end
 
-    return { atk = atk, def = def, maxHp = maxHp }
+    return { atk = atk, def = def, maxHp = maxHp, aspd = self.aspd }
 end
 
 function Player:EquipItem(bagSlot)

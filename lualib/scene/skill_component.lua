@@ -1,10 +1,12 @@
 local Class = require "common.class"
 local FightGroupComponent = require "scene.fight_group_component"
 local f32 = require "common.float32"
+local AttributeComponent = require "scene.attribute_component"
 
 ---@class SkillComponent
 ---@field owner SceneUnit
 ---@field lastCast table|nil
+---@field basicAttackReadyAtMs number
 local SkillComponent = Class("SkillComponent")
 
 -- 同一个场景服务中的所有施法者共用序号。换图重建组件时继续取下一个号。
@@ -17,10 +19,33 @@ local TARGET_ALL = 0
 local TARGET_ENEMY = 4
 local TARGET_DEAD_FRIEND = 5
 
+local basicAttackActionSeconds = {
+    Player_Novice_GongJi_1 = 0.9,
+}
+
 -- 每个宿主拥有自己的最近施法记录。开始施法时从宿主读取 UID。
 function SkillComponent:Ctor(owner)
     self.owner = owner
     self.lastCast = nil
+    self.basicAttackReadyAtMs = 0
+end
+
+-- 根据这次成功普攻的最终攻速和动作资源，计算自身冷却毫秒。
+function SkillComponent:GetBasicAttackCooldownMs(skill, effect)
+    local seconds = f32(effect.PVECoolTime or 0)
+    local aspd = self.owner:GetComponent(AttributeComponent).aspd
+    if skill.SkillDamType == 0 and (skill.IsAffectedASPD or 0) ~= 0 and aspd > 0 then
+        local scale = f32(1 / f32(f32(aspd) / 10000))
+        if scale > 1 then
+            seconds = f32(seconds * scale)
+        else
+            local actionSeconds = basicAttackActionSeconds[effect.SkillScriptPrefix]
+            if actionSeconds then
+                seconds = f32(f32(actionSeconds) * scale)
+            end
+        end
+    end
+    return math.floor(f32(seconds * 1000))
 end
 
 -- 只计算本次施法的 SP 门槛，不修改资源。当前效果表使用 {0,0} 或 {7,基础值}。

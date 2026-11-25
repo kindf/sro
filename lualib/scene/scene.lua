@@ -481,16 +481,23 @@ function Scene:CastSkill(uid, req, now)
     end
 
     -- 技能冷却检查
-    local cooldown = effect.PVECoolTime or 0
-    local last = unit.skillCooldown[req.skillId]
-    if last and now - last < cooldown then
+    local nowMs = math.floor(now * 1000 + 0.5)
+    local playerBasicAttack = req.skillId == 1 and unit:IsPlayer()
+    local cooling
+    if playerBasicAttack then
+        cooling = nowMs < skills.basicAttackReadyAtMs
+    else
+        local last = unit.skillCooldown[req.skillId]
+        cooling = last ~= nil and now - last < (effect.PVECoolTime or 0)
+    end
+
+    if cooling then
         failed.code = SKILL_COOLDOWNING
         return failed
     end
 
     -- 技能组冷却检查
     local groupId = effect.PVEGroupCoolTimeType or 0
-    local nowMs = math.floor(now * 1000 + 0.5)
     local readyAtMs = unit.skillGroupReadyAtMs[groupId]
     if readyAtMs and nowMs < readyAtMs then
         failed.code = SKILL_COOLDOWNING
@@ -518,6 +525,9 @@ function Scene:CastSkill(uid, req, now)
     end
 
     unit.skillCooldown[req.skillId] = now
+    if playerBasicAttack then
+        skills.basicAttackReadyAtMs = nowMs + skills:GetBasicAttackCooldownMs(skill, effect)
+    end
     local groupDurationMs = math.floor((effect.PVEGroupCoolTime or 0) * 1000 + 0.5)
     if groupDurationMs > 0 then
         unit.skillGroupReadyAtMs[groupId] = nowMs + groupDurationMs
